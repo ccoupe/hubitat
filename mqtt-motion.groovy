@@ -39,9 +39,11 @@ metadata {
         
     command "enable"
     command "disable"
+    command "delay", ["Number"]
         
     attribute "motion", "string"
     attribute "motion","ENUM",["active","inactive"]
+    attribute "timeout", "number"
   }
 
   preferences {
@@ -121,4 +123,9 @@ def disable() {
 def enable() {
   log.debug settings?.topicSub + " enable sensor"
   interfaces.mqtt.publish(settings?.topicSub, "enable", settings?.QOS.toInteger(), settings?.retained)
+}
+
+def delay(Number s) {
+  log.debug settings?.topicSub + " set delay to " + s
+  interfaces.mqtt.publish(settings?.topicSub, "delay=${s}", settings?.QOS.toInteger(), settings?.retained)
 }
