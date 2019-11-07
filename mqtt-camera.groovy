@@ -1,18 +1,9 @@
 /**
-   * Note: I borrowed a lot of code from the author below and other examples. CJC.
+   * Note: I borrowed a lot of code from the net - Thanks. CJC.
    
-   *  ****************  MQTT Virtual Switch Control Driver  ****************
+   *  ****************  MQTT Camera Driver (as Motion Sensor) ****************
    *
    *  importUrl: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy"
-   *
-   *  Design Usage:
-   *  This driver is a MQTT Virtual Switch Control Driver to pull and post to a MQTT broker.
-   *
-   *  Copyright 2019 Helene Bor
-   *  
-   *  This driver is free and you may do as you like with it.  Big thanks to bptworld, aaronward and martinez.mp3 for their work toward this driver
-   *
-   *  Remember...I am not a programmer, everything I do takes a lot of time and research (then MORE research)! (Wise words from aaronward and they still apply here!)
    *
    * ------------------------------------------------------------------------------------------------------------------------------
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -33,17 +24,12 @@
    */
 
 metadata {
-  definition (name: "MQTT Motion Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy") {
+  definition (name: "MQTT Camera Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy") {
     capability "Initialize"
     capability "MotionSensor"
         
-    command "enable"
-    command "disable"
-    command "delay", ["Number"]
-        
     attribute "motion", "string"
     attribute "motion","ENUM",["active","inactive"]
-    attribute "timeout", "number"
   }
 
   preferences {
@@ -76,9 +62,9 @@ def parse(String description) {
       sendEvent(name: "motion", value: payload)
      
   } else {
-      //sendEvent(name: "motion", value: topic.get('payload'))
+      sendEvent(name: "motion", value: topic.get('payload'))
   }
-
+}
 
 def updated() {
   if (logEnable) log.info "Updated..."
@@ -91,12 +77,12 @@ def uninstalled() {
 }
 
 def initialize() {
-	if (logEnable) runIn(900,logsOff) // clears debugging after 900 somethings
+	//if (logEnable) runIn(900,logsOff)
 	try {
     def mqttInt = interfaces.mqtt
     //open connection
     mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
-    mqttInt.connect(mqttbroker, "hubitat", settings?.username,settings?.password)
+    mqttInt.connect(mqttbroker, "hubitat_camera", settings?.username,settings?.password)
     //give it a chance to start
     pauseExecution(1000)
     log.info "Connection established"
@@ -115,20 +101,4 @@ def mqttClientStatus(String status){
 def logsOff(){
   log.warn "Debug logging disabled."
   device.updateSetting("logEnable",[value:"false",type:"bool"])
-}
-
-// Send commands to device via MQTT
-def disable() {
-  log.debug settings?.topicSub + " disable sensor"
-  interfaces.mqtt.publish(settings?.topicSub, "disable", settings?.QOS.toInteger(), settings?.retained)
-}
-
-def enable() {
-  log.debug settings?.topicSub + " enable sensor"
-  interfaces.mqtt.publish(settings?.topicSub, "enable", settings?.QOS.toInteger(), settings?.retained)
-}
-
-def delay(Number s) {
-  log.debug settings?.topicSub + " set delay to " + s
-  interfaces.mqtt.publish(settings?.topicSub, "delay=${s}", settings?.QOS.toInteger(), settings?.retained)
 }
