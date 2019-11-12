@@ -1,6 +1,7 @@
 /**
    * Note: I borrowed a lot of code from the net - Thanks. CJC.
-   
+   * Assumes motioneye communicates to MQTT - does not accept commands
+   * from hubitat.
    *  ****************  MQTT Camera Driver (as Motion Sensor) ****************
    *
    *  importUrl: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy"
@@ -24,7 +25,7 @@
    */
 
 metadata {
-  definition (name: "MQTT Camera Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy") {
+  definition (name: "MQTT MotionEye Camera Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy") {
     capability "Initialize"
     capability "MotionSensor"
         

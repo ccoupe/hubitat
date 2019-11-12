@@ -1,6 +1,11 @@
 /**
-   * Note: I borrowed a lot of code from the author below and other examples. CJC.
+   * Note: I borrowed a lot of code from the net - Thanks. CJC.
+   * Assumes motioneye communicates to MQTT - does not accept commands
+   * from hubitat.
+   *  ****************  MQTT Camera Driver (as Motion Sensor) ****************
    *
+   *  importUrl: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-esp32-cam.groovy"
+   * ------------------------------------------------------------------------------------------------------------------------------
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    *  in compliance with the License. You may obtain a copy of the License at:
    *
@@ -19,17 +24,15 @@
    */
 
 metadata {
-  definition (name: "MQTT Motion Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-motion.groovy") {
+  definition (name: "MQTT ESP32-Cam Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-esp32-cam.groovy") {
     capability "Initialize"
     capability "MotionSensor"
-        
+    
     command "enable"
     command "disable"
-    command "delay", ["Number"]
         
     attribute "motion", "string"
     attribute "motion","ENUM",["active","inactive"]
-    attribute "timeout", "number"
   }
 
   preferences {
@@ -64,7 +67,7 @@ def parse(String description) {
   } else {
       //sendEvent(name: "motion", value: topic.get('payload'))
   }
-
+}
 
 def updated() {
   if (logEnable) log.info "Updated..."
@@ -77,12 +80,12 @@ def uninstalled() {
 }
 
 def initialize() {
-	if (logEnable) runIn(900,logsOff) // clears debugging after 900 somethings
+	if (logEnable) runIn(900,logsOff)
 	try {
     def mqttInt = interfaces.mqtt
     //open connection
     mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
-    mqttInt.connect(mqttbroker, "hubitat", settings?.username,settings?.password)
+    mqttInt.connect(mqttbroker, "hubitat_camera", settings?.username,settings?.password)
     //give it a chance to start
     pauseExecution(1000)
     log.info "Connection established"
@@ -112,9 +115,4 @@ def disable() {
 def enable() {
   log.debug settings?.topicSub + " enable sensor"
   interfaces.mqtt.publish(settings?.topicSub, "enable", settings?.QOS.toInteger(), settings?.retained)
-}
-
-def delay(Number s) {
-  log.debug settings?.topicSub + " set delay to " + s
-  interfaces.mqtt.publish(settings?.topicSub, "delay=${s}", settings?.QOS.toInteger(), settings?.retained)
 }
