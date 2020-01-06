@@ -1,39 +1,26 @@
-/**
-     * Note: I borrowed a lot of code from the author below. CJC.
-     
-     *  ****************  MQTT Virtual Switch Control Driver  ****************
-     *
-     *  importUrl: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy"
-     *
-     *  Design Usage:
-     *  This driver is a MQTT Virtual Switch Control Driver to pull and post to a MQTT broker.
-     *
-     *  Copyright 2019 Helene Bor
-     *  
-     *  This driver is free and you may do as you like with it.  Big thanks to bptworld, aaronward and martinez.mp3 for their work toward this driver
-     *
-     *  Remember...I am not a programmer, everything I do takes a lot of time and research (then MORE research)! (Wise words from aaronward and they still apply here!)
-     *
-     * ------------------------------------------------------------------------------------------------------------------------------
-     *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
-     *  in compliance with the License. You may obtain a copy of the License at:
-     *
-     *      http://www.apache.org/licenses/LICENSE-2.0
-     *
-     *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
-     *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
-     *  for the specific language governing permissions and limitations under the License.
-     *
-     * ------------------------------------------------------------------------------------------------------------------------------
-     *
-     *
-     *  Changes:
-     *
-     *  1.0.0 - Initial release
-     */
+/*
+   * ------------------------------------------------------------------------------------------------------------------------------
+   *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+   *  in compliance with the License. You may obtain a copy of the License at:
+   *
+   *      http://www.apache.org/licenses/LICENSE-2.0
+   *
+   *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+   *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+   *  for the specific language governing permissions and limitations under the License.
+   *
+   * ------------------------------------------------------------------------------------------------------------------------------
+   *
+   *
+   *  Changes:
+   *
+   *  1.0.0 - Initial release
+   */
 
     metadata {
-        definition (name: "MQTT Virtual Multi Driver", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/shomegit/MQTT-Virtual-Switch-Control-Driver/master/MQTT-Virtual-Switch-Control-Driver.groovy") {
+        definition (name: "MQTT Virtual Multi Driver", namespace: "ccoupe", 
+          author: "Cecil Coupe", 
+          importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-ups.groovy") {
             capability "Initialize"
             capability "MotionSensor"
             capability "TemperatureMeasurement"
