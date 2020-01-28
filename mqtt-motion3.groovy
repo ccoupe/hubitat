@@ -64,10 +64,10 @@ def parse(String description) {
   topic = msg.get('topic')
   payload = msg.get('payload')
   if (topic.endsWith("motion")) {
-    if (payload.startsWith("active")) {
+    if (payload.startsWith("active") || payload=="true") {
         if (logEnable) log.info "mqtt ${topic} => ${payload}"
         sendEvent(name: "motion", value: "active")
-    } else if (payload.startsWith("inactive")){
+    } else if (payload.startsWith("inactive") || payload=="false"){
         if (logEnable) log.info "mqtt ${topic} => ${payload}"
         sendEvent(name: "motion", value: "inactive")
     }
