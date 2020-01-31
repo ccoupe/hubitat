@@ -103,7 +103,7 @@ def initialize() {
     mqttInt.connect(mqttbroker, "hubitat_${device}", settings?.username,settings?.password)
     //give it a chance to start
     pauseExecution(200)
-    def topicTop = "${settings?.topicSub}/motion}"
+    def topicTop = "${settings?.topicSub}/motion"
     log.info "Connection established"
 		if (logEnable) log.debug "Subscribed to: ${topicTop}"
     mqttInt.subscribe(topicTop)
