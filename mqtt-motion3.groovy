@@ -1,5 +1,6 @@
 /**
-   * Note: I borrowed a lot of code from the author below and other examples. CJC.
+   * mqtt-motion3.groovy.
+   * Author: Cecil Coupe - derived from sample codes from many others.
    *
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    *  in compliance with the License. You may obtain a copy of the License at:
@@ -14,7 +15,7 @@
    */
    
    /* 
-    * Version 2 uses json and OLD arduino end device
+    * Version 2 uses json for configuration messages
     * Version 3 - January 26, 2020 - uses homie v3 topic structure, non-json
    */
 
@@ -23,7 +24,7 @@ metadata {
     capability "Initialize"
     capability "MotionSensor"
     capability "Configuration"
-    //capability "Refresh"
+    capability "Refresh"
 
 
     //command "enable"
@@ -39,10 +40,10 @@ metadata {
     input name: "username", type: "text", title: "MQTT Username:", description: "(blank if none)", required: false, displayDuringSetup: true
     input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false, displayDuringSetup: true
     input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
-        description: "Example Topic (homie/family_motion1/sensor/motion). Please don't use a #", 
+        description: "Example: homie/family_motion1/motionsensor 'motion' is assumed",
         required: false, displayDuringSetup: true
-    input name: "topicPub", type: "text", title: "Topic to Publish:",
-        description: "Example Topic (homie/family_motion1/sensor/active_hold)", 
+    input name: "propertySub", type: "text", title: "Additional sub-topic for property.",
+        description: "Example: active_hold", 
         required: false, displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required: false, defaultValue: false, displayDuringSetup: true
@@ -71,7 +72,7 @@ def parse(String description) {
         if (logEnable) log.info "mqtt ${topic} => ${payload}"
         sendEvent(name: "motion", value: "inactive")
     }
-  } else if (topic.endsWith("active_hold")) {
+  } else if (topic.endsWith(settings?.propertySub)) {
     device.updateSetting("active_hold", [value: payload.toInteger(), type: "number"] )
     sendEvent(name: "active_hold",  value: payload.toInteger(), displayed: true )
     if (logEnable) log.info "remote active_hold is mqtt ${payload}"
@@ -83,10 +84,10 @@ def parse(String description) {
 
 def updated() {
   if (logEnable) log.info "Updated..."
-  if (interfaces.mqtt.isConnected() == false)
+  if (interfaces.mqtt.isConnected() == false) {
     initialize()
-  else 
-    configure()
+  }
+  configure()
 }
 
 def uninstalled() {
@@ -101,11 +102,16 @@ def initialize() {
     mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
     mqttInt.connect(mqttbroker, "hubitat_${device}", settings?.username,settings?.password)
     //give it a chance to start
-    pauseExecution(1000)
+    pauseExecution(200)
+    def topicTop = "${settings?.topicSub}/motion}"
     log.info "Connection established"
-		if (logEnable) log.debug "Subscribed to: ${settings?.topicSub}"
-    mqttInt.subscribe(settings?.topicSub)
-    refresh()   // get device config
+		if (logEnable) log.debug "Subscribed to: ${topicTop}"
+    mqttInt.subscribe(topicTop)
+    if (settings?.propertySub) {
+      def urltmp = "${settings?.topicSub}/${settings?.propertySub}"
+      if (logEnable) log.debug "Subscribed to: ${urltmp}"
+      mqttInt.subscribe(urltmp)
+     }
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
@@ -146,18 +152,29 @@ def logsOff(){
   device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
-// Dangerous
+// Do nothing for now - 
+// unsub/resub to property topic - cause parse to run ?
 def refresh() {
-  if (logEnable) log.debug settings?.topicPub + " get configuation"
-  interfaces.mqtt.publish(settings?.topicPub, "", settings?.QOS.toInteger(), settings?.retained)
-  sendEvent(name: "active_hold", value: settings.active_hold, displayed: true);
+  if (settings?.propertySub) {
+    def urltmp = "${settings?.topicSub}/${settings?.propertySub}"
+    interfaces.mqtt.unsubscribe(urltmp)
+    pauseExecution(100)
+    interfaces.mqtt.subscribe(urltmp)
+    if (logEnable) log.debug "Refresh: re-subscribed to: ${urltmp}"
+  } else {
+    if (logEnable) log.debug "nothing to refresh"
+  }
 }
 
+// 
 def configure() {
   log.info "Configure.."
-  def actives = settings?.active_hold.toString()
-  interfaces.mqtt.publish("${settings?.topicPub}/set", actives, settings?.QOS.toInteger(), true)
-  if (logEnable) log.debug "setting active_hold to ${actives}"
-  sendEvent(name: "active_hold", value: settings.active_hold, displayed: true);
+  if (settings?.propertySub) {
+    def actives = settings?.active_hold.toString()
+    def urltmp = "${settings?.topicSub}/${settings?.propertySub}/set"
+    interfaces.mqtt.publish(urltmp, actives, settings?.QOS.toInteger(), false)
+    if (logEnable) log.debug "setting ${urltmp} to ${actives}"
+    sendEvent(name: "active_hold", value: settings.active_hold, displayed: true);
+  }
 }
 
