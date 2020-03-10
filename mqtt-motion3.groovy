@@ -17,6 +17,7 @@
    /* 
     * Version 2 uses json for configuration messages
     * Version 3 - January 26, 2020 - uses homie v3 topic structure, non-json
+    * Version 3.1 - March 8, 2020 - optional - ask for face/body detection
    */
 
 metadata {
@@ -25,6 +26,7 @@ metadata {
     capability "MotionSensor"
     capability "Configuration"
     capability "Refresh"
+		capability "Switch"     // not all devices implement this. That's OK
 
 
     //command "enable"
@@ -50,6 +52,10 @@ metadata {
     input name: "active_hold", type: "number", title: "Active Hold",
         required: false, displayDuringSetup: true, defaultValue: 45,
         description: "Number of seconds to wait for more motion when active"
+    input name: "isCamera", type: "bool", title: "Activate Camera Hack", 
+        required: true, defaultValue: false
+    input name: "detect", type: "bool", title: "Use AI Detection?", 
+        required: true, defaultValue: false
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
 }
@@ -64,14 +70,29 @@ def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
+  log.info "${device} ${topic} => ${payload}"
   if (topic.endsWith("motion")) {
     if (payload.startsWith("active") || payload=="true") {
-        if (logEnable) log.info "mqtt ${topic} => ${payload}"
+      if (settings?.detect) {
+        runIn(5, request_detect()
+      } else {
         sendEvent(name: "motion", value: "active")
     } else if (payload.startsWith("inactive") || payload=="false"){
-        if (logEnable) log.info "mqtt ${topic} => ${payload}"
+      if (settings?.detect) {
+        request_detect()
+      } else {
         sendEvent(name: "motion", value: "inactive")
     }
+  } else if (topic.endsWith("control") {
+    log.info "Detection is ${payloag}"
+    if (payload=="true") {
+      sendEvent(name: "motion", value: "active")
+    } else if (payload=="false") {
+      sendEvent(name: "motion", value: "inactive")
+    } else {
+      log.warn "unknown payload on ${topic}"
+    }
+  }
   } else if (topic.endsWith(settings?.propertySub)) {
     device.updateSetting("active_hold", [value: payload.toInteger(), type: "number"] )
     sendEvent(name: "active_hold",  value: payload.toInteger(), displayed: true )
@@ -112,6 +133,11 @@ def initialize() {
       if (logEnable) log.debug "Subscribed to: ${urltmp}"
       mqttInt.subscribe(urltmp)
      }
+    if (settings?.detect) {
+      def urltmp = "${settings?.topicSub}/control"
+      if (logEnable) log.debug "Subscribed to: ${urltmp}"
+      mqttInt.subscribe(urltmp)
+    }
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
@@ -178,3 +204,27 @@ def configure() {
   }
 }
 
+// Camera Hack
+def off() {
+  if (settings.isCamera) {
+    def topic = "${settings?.topicSub}/control/set"
+    if (logEnable) log.debug " ${topic} off"
+    interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), settings?.retained)
+  }
+}
+
+def on() {
+  if (settings.isCamera) {
+    def topic = "${settings?.topicSub}/control/set"
+    if (logEnable) log.debug " ${topic} on"
+    interfaces.mqtt.publish(topic, "on", settings?.QOS.toInteger(), settings?.retained)
+  }
+}
+
+def request_detect() {
+  if (settings.isCamera) {
+    def topic = "${settings?.topicSub}/control/set"
+    if (logEnable) log.debug " ${topic} detect"
+    interfaces.mqtt.publish(topic, "detect", settings?.QOS.toInteger(), settings?.retained)
+  }
+}
