@@ -18,7 +18,7 @@
    */
 
 import groovy.json.JsonSlurper 
-
+import java.util.GregorianCalendar
 
 metadata {
   definition (name: "MQTT UPS Monitor", namespace: "ccoupe", 
@@ -31,9 +31,12 @@ metadata {
     //capability "Refresh"
            
     attribute "powerSource", "ENUM", ["battery", "dc", "mains", "unknown"]
+    attribute "load", "number"
+    attribute "runtime", "number"
     attribute "battery", "number"
     attribute "ups_mfr", "string"
     attribute "ups_model", "string"
+    attribute "time_max", "string"
  }
 
   preferences {
@@ -78,6 +81,17 @@ def parse(String description) {
       sendEvent(name: "powerSource", value: "mains", displayed: true);
     else // "OB"
       sendEvent(name: "powerSource", value: "battery", displayed: true);    
+  }
+  if (rmconf['ups.load']) {
+    sendEvent(name: "load", value: rmconf['ups.load'], displayed: true);
+  }
+  if (rmconf['battery.runtime']) {
+    sendEvent(name: "runtime", value: rmconf['battery.runtime'], displayed: true);
+    def c = Calendar.instance
+    c.clear()
+    c.set(Calendar.SECOND, rmconf['battery.runtime'].toInteger())
+    String str = c.format('HH:mm:ss')
+    sendEvent(name: "time_max", value: str, displayed: true);
   }
   if (rmconf['battery.charge']) {
     sendEvent(name: "battery", value: rmconf['battery.charge'], displayed: true);
