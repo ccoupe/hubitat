@@ -18,6 +18,11 @@
     * Version 2 uses json for configuration messages
     * Version 3 - January 26, 2020 - uses homie v3 topic structure, non-json
     * Version 3.1 - March 8, 2020 - optional - ask for face/body detection
+    * Version 3.2 - March 24, 2020 
+            - enable/disable. 
+            - select ML algorithm
+      Version 3.3 - Jun ??, 2020 - move face/body detect to a cmd setting
+          and not a per event cycle.
    */
 
 metadata {
@@ -29,8 +34,8 @@ metadata {
 		capability "Switch"     // not all devices implement this. That's OK
 
 
-    //command "enable"
-    //command "disable"
+    command "enable"
+    command "disable"
        
     attribute "motion", "string"
     attribute "motion","ENUM",["active","inactive"]
@@ -54,12 +59,21 @@ metadata {
         description: "Number of seconds to wait for more motion when active"
     input name: "isCamera", type: "bool", title: "Activate Camera Hack", 
         required: true, defaultValue: false
-    input name: "detect", type: "bool", title: "Use AI Detection?", 
-        required: true, defaultValue: false
+    input ("detect", "enum", title: "ML Detection",
+            require: false, 
+            displayDuringSetup:true,
+            options: algo_list_map(), defaultValue: "None")
+    input name: "capDelay", type: "number", title: "Delay Capture",
+        required: false, displayDuringSetup: true, defaultValue: 5,
+        description: "Number of seconds to wait for video capture"
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
 }
 
+def algo_list_map() {
+  return ["None", "Device Default", "Cnn_Face", "Cnn_Shapes", "Haar_Face", 
+    "Haar_UpperBody", "Haar_FullBody", "Hog_People"]
+}
 
 def installed() {
     log.info "installed..."
@@ -73,18 +87,24 @@ def parse(String description) {
   log.info "${device} ${topic} => ${payload}"
   if (topic.endsWith("motion")) {
     if (payload.startsWith("active") || payload=="true") {
-      if (settings?.detect) {
-        runIn(5, request_detect()
+      if (settings?.detect && settings?.detect != 'None') {
+        def delay = 5
+        if (settings?.capDelay) {
+          delay = settings.capDelay.toInteger()
+        }
+        runIn(delay, request_detect)
       } else {
         sendEvent(name: "motion", value: "active")
-    } else if (payload.startsWith("inactive") || payload=="false"){
-      if (settings?.detect) {
+      }
+    } else if (payload.startsWith("inactive") || payload=="false") {
+      if (settings?.detect && settings?.detect != 'None') {
         request_detect()
       } else {
         sendEvent(name: "motion", value: "inactive")
+      }
     }
-  } else if (topic.endsWith("control") {
-    log.info "Detection is ${payloag}"
+  } else if (topic.endsWith("control")) {
+    log.info "${device} ML Detection is ${payload}"
     if (payload=="true") {
       sendEvent(name: "motion", value: "active")
     } else if (payload=="false") {
@@ -92,7 +112,6 @@ def parse(String description) {
     } else {
       log.warn "unknown payload on ${topic}"
     }
-  }
   } else if (topic.endsWith(settings?.propertySub)) {
     device.updateSetting("active_hold", [value: payload.toInteger(), type: "number"] )
     sendEvent(name: "active_hold",  value: payload.toInteger(), displayed: true )
@@ -221,10 +240,31 @@ def on() {
   }
 }
 
+def enable() {
+  if (settings.isCamera) {
+    def topic = "${settings?.topicSub}/control/set"
+    if (logEnable) log.debug " ${topic} ${det}"
+    interfaces.mqtt.publish(topic, "enable", settings?.QOS.toInteger(), settings?.retained)
+  }
+}
+
+def disable() {
+  if (settings.isCamera) {
+    def topic = "${settings?.topicSub}/control/set"
+    if (logEnable) log.debug " ${topic} ${det}"
+    interfaces.mqtt.publish(topic, "disable", settings?.QOS.toInteger(), settings?.retained)
+  }
+}
+
 def request_detect() {
   if (settings.isCamera) {
     def topic = "${settings?.topicSub}/control/set"
-    if (logEnable) log.debug " ${topic} detect"
-    interfaces.mqtt.publish(topic, "detect", settings?.QOS.toInteger(), settings?.retained)
+    def algo = settings.detect
+    def det = "detect"
+    if (algo != "Device Default") {
+      det = "detect" + "-" + algo
+    }
+    if (logEnable) log.debug " ${topic} ${det}"
+    interfaces.mqtt.publish(topic, det, settings?.QOS.toInteger(), settings?.retained)
   }
 }

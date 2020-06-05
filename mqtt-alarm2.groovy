@@ -4,6 +4,7 @@
    * Purpose:
    *  Notification and Speech Synthesis:  text to TTS, sends mp3 to MQTT topic.
    *    where it is played by some device specific listener on the MQTT topic
+   *  Chimes use a number to pick a sound at the device. 1 is the default. 0 means stop.
    *
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    *  in compliance with the License. You may obtain a copy of the License at:
@@ -29,11 +30,12 @@ metadata {
     capability "Refresh"
     capability "SpeechSynthesis"
     capability "Notification"
-		capability "Chime"
+	capability "Chime"
 		
-		attribute "status", ENUM["playing","stopped"]
-		attribute "soundName", "string"
-		attribute "soundEffects", "string"
+	attribute "status", "ENUM", ["playing","stopped"]
+	attribute "soundName", "string"
+	attribute "soundEffects", "string", "{1=Doorbell, 2=Siren, 3=Horn, 10=Cops_Arrive, 11=Enjoy}"
+
   }
 
   preferences {
@@ -49,9 +51,10 @@ metadata {
             require: false, 
             displayDuringSetup:true,
             options: getVoices(), defaultValue: "Salli")
-    input name: ("soundName", "enum", title: "Pick a Sound",
+    input ("soundName", "enum", title: "Pick a Sound",
 						require: false,
-						options: ["Default"], defaultValue: "Default")
+						options: getSounds(),
+            defaultValue: "1 - Default")
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
 }
@@ -66,6 +69,11 @@ def getVoices() {
 	return list
 }
 
+def getSounds() {
+  
+  return ["1 - Doorbell", "2 - Siren", "3 - Horn", "10 - Cops_Arrive", "11 - Enjoy"]
+}
+
 def installed() {
     log.info "installed..."
 }
@@ -75,6 +83,13 @@ def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
+  if (topic == "${settings.topicPub}/\$state") {
+    if (payload == "busy") {
+      sendEvent(name: "status", value: "playing", displayed: true);
+    } else if (payload == "ready") {
+      sendEvent(name: "status", value: "stopped", displayed: true);
+    }
+  }
 }
 
 
@@ -100,8 +115,9 @@ def initialize() {
     //give it a chance to start
     pauseExecution(200)
     log.info "Connection established"
-		//if (logEnable) log.debug "Subscribed to: ${topicTop}"
-    //mqttInt.subscribe(topicTop)
+    topic = "${settings.topicPub}/\$state"
+		if (logEnable) log.debug "Subscribed to: ${topic}"
+    mqttInt.subscribe(topic)
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
@@ -184,22 +200,28 @@ def speakpub(text, wrap) {
 // -- chime ---
 def playSound(soundNumber) {
 	def topic = "${settings.topicPub}/chime/sound/set"
-	def num = settings?soundName
+  // map soundNumber to options string
+  def sndList = getSounds()
+  sndNum = soundNumber.toString()
+  sndEntry = "1 - Doorbell"       // default
+  for (snd in sndList) {
+    flds = snd.split("-")
+    if (flds[0].trim() == sndNum) {
+      sndEntry = snd
+      break
+    }
+  }
 	if (logEnable) {
-		log.debug "publish ${num} to ${topic}"
+		log.debug "publish ${sndEntry} to ${topic}"
 	}
-	num = 1 // hard code for now
-	interfaces.mqtt.publish(topic, num, settings?.QOS.toInteger(), false)
-	sendEvent(name: "status", value: "playing", displayed: true);
+	interfaces.mqtt.publish(topic, sndEntry, settings?.QOS.toInteger(), false)
 }
 
 def stop() {
 	def topic = "${settings.topicPub}/chime/sound/set"
 	if (logEnable) {
-		log.debug "publish '0' (stop) to ${topic}"
+		log.debug "publish 'stop' to ${topic}"
 	}
-	num = 0 
-	interfaces.mqtt.publish(topic, "0", settings?.QOS.toInteger(), false)
-	sendEvent(name: "status", value: "stopped", displayed: true);
+	interfaces.mqtt.publish(topic, "stop", settings?.QOS.toInteger(), false)
 }
 

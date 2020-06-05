@@ -91,7 +91,6 @@ def initialize() {
     log.info "Connection established"
 		if (logEnable) log.debug "Subscribed to: ${settings?.topicSub}"
     mqttInt.subscribe(settings?.topicSub)
-    refresh()   // get device config
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
