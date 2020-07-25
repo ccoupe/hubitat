@@ -36,14 +36,18 @@ metadata {
     capability "Configuration"
     capability "Refresh"
     capability "SpeechSynthesis"
-    //capability "Notification"
     capability "Switch"
     capability "Alarm"
-    //capability "ContactSensor"
-    
+    capability "Chime"
+		
     attribute "switch","ENUM",["on","off"]
     attribute "alarm","ENUM",["strobe", "off", "both", "siren"]
-    //attribute "contact","ENUM",["closed","open"]
+    attribute "status", "ENUM", ["playing","stopped"]
+    attribute "soundName", "string"
+    attribute "soundEffects", "{1=Doorbell, 2=Siren, 3=Horn, 10=Cops_Arrive, 11=Enjoy}"
+    
+    command "register"
+    
   }
 
   preferences {
@@ -58,14 +62,16 @@ metadata {
         required: false, displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required: false, defaultValue: false, displayDuringSetup: true
-/*
-    input ("voice", "enum", title: "Pick a Voice",
-            require: false, 
-            displayDuringSetup:true,
-            options: getVoices(), defaultValue: "Salli")
-*/
+    input ("soundName", "enum", title: "Chime Sound",
+						require: false,
+						options: getSounds(),
+            defaultValue: "1 - Default")
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
+}
+
+def getSounds() {
+  return ["1 - Doorbell", "2 - Siren", "3 - Horn", "10 - Cops_Arrive", "11 - Enjoy"]
 }
 
 /*
@@ -91,20 +97,16 @@ def parse(String description) {
   payload = msg.get('payload')
   //log.info "TB incoming ${topic} <- ${payload}"
   if (topic == "homie/${settings.topicPub}/\$state") {
-    cur_state = state.tbmqtt
-    if (payload == 'running' && cur_state == 'idle') {
+    if ((payload == 'busy' || payload == 'running')) {
       log.info "Trumpy Bear is running"
-      state.tbmqtt = 'running'
-    } else if (payload == 'idle' && cur_state == 'running') {
+      state.tbmqtt = 'busy'
+    } else if ((payload == 'idle' || payload == 'ready')) {
       state.tbmqtt = 'idle'
       log.info "Trumpy Bear turns off its switch"
       sendEvent(name: "switch", value: "off")
-    } else if (payload == 'alarm' && cur_state == 'running') {
+    } else if (payload == 'alarm') {
       log.info "Trumpy Bear wants to set the alarms"
-      sendEvent(name: "switch", value: "off")
-      //sendEvent(name: "contact", value: "open")
-      //state.tbmqtt = 'alarm'
-      //runInMillis(1000, contactOff)
+      //sendEvent(name: "switch", value: "off")
     } else {
       log.info "TB unhandled ${topic} ${payload}"
     }
@@ -182,18 +184,9 @@ def refresh() {
     if (logEnable) log.debug "nothing to refresh"
 }
 
-// Set the voice, 
+// Pass along the choice of cameras
 def configure() {
   log.info "Configure.."
-/*
-  if (settings.voice) {
-    state.voice = settings.voice
-  } else {
-    state.voice = "Brian"
-  }
-  sendEvent([name:'voice', value: state.voice, displayed:true])
-  log.info "Chosen Voice: ${state.voice}"
-*/
   // init TrumpBear with camera choice
   def topic = "homie/${settings.topicPub}/control/cmd/set"
   def map = [:]
@@ -204,35 +197,9 @@ def configure() {
 }
 
 def speak(text) {
-  //speakpub(text, false)
   def urltmp = "homie/${settings.topicPub}/speech/say/set"
   interfaces.mqtt.publish(urltmp, text, settings?.QOS.toInteger(), false)}
 
-/*
-def deviceNotification(text) {
-  def topic = "homie/${settings.topicPub}/control/cmd/set"
-  def map = [:]
-  map['cmd'] = 'alarm'
-  map['text'] = text
-  def json = JsonOutput.toJson(map)
-  interfaces.mqtt.publish(topic, json, settings?.QOS.toInteger(), settings?.retained)
-
-}
-
-def speakpub(text, wrap) {
-  if (wrap) {
-    text = "<emphasis level=\"strong\">" + text + "</emphasis>"
-  }
-  def sound = textToSpeech(text, state.voice)
-  def urltmp = "homie/${settings.topicPub}/player/url/set"
-  def payload = sound.uri
-  if (logEnable) {
-    log.debug "speak(${text}) => ${payload}"
-    log.debug "publish to: ${urltmp}"
-  }
-  interfaces.mqtt.publish(urltmp, payload, settings?.QOS.toInteger(), false)
-}
-*/
 
 def on() {
   sendEvent(name: "switch", value: "on")
@@ -245,6 +212,7 @@ def on() {
   if (logEnable) log.info "TrumpyBear Triggered"
 }
 
+// Off will reset Trumpy Bear and stop the chimes and siren
 def off() {
   sendEvent(name: "switch", value: "off")
   def topic = "homie/${settings.topicPub}/control/cmd/set"
@@ -252,13 +220,12 @@ def off() {
   map['cmd'] = 'end'
   def json = JsonOutput.toJson(map)
   interfaces.mqtt.publish(topic, json, settings?.QOS.toInteger(), settings?.retained)
-  alarmOff()
+  stop()      //chime
+  alarmOff()  //siren a strobe
   if (logEnable) log.info "TrumpBear force cycle end"
 } 
 
-def contactOff() {
-  sendEvent(name: "contact", value: "closed")
-}
+// ---- Siren -----
 
 def both() {
   siren()
@@ -280,4 +247,43 @@ def alarmOff() {
   interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), settings?.retained)
   topic = "homie/${settings.topicPub}/strobe/state/set"
   interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), settings?.retained)
+}
+
+// -- chime ---
+def playSound(soundNumber) {
+	def topic = "homie/${settings.topicPub}/chime/state/set"
+  // map soundNumber to options string
+  def sndList = getSounds()
+  sndNum = soundNumber.toString()
+  sndEntry = "1 - Doorbell"       // default
+  for (snd in sndList) {
+    flds = snd.split("-")
+    if (flds[0].trim() == sndNum) {
+      sndEntry = snd
+      break
+    }
+  }
+	if (logEnable) {
+		log.debug "publish ${sndEntry} to ${topic}"
+	}
+	interfaces.mqtt.publish(topic, sndEntry, settings?.QOS.toInteger(), false)
+}
+
+// Use the stop button for both Chimes and Siren/Strobe
+def stop() {
+	def topic = "homie/${settings.topicPub}/chime/state/set"
+	if (logEnable) {
+		log.debug "publish 'stop' to ${topic}"
+	}
+	interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), false)
+  alarmOff()
+}
+
+def register() {
+    def topic = "homie/${settings.topicPub}/control/cmd/set"
+  def map = [:]
+  map['cmd'] = 'register'
+  def json = JsonOutput.toJson(map)
+  interfaces.mqtt.publish(topic, json, settings?.QOS.toInteger(), settings?.retained)
+  if (logEnable) log.info "Mycroft: ${json} -> ${topic}"
 }

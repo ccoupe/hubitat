@@ -1,10 +1,14 @@
 /**
-   * mqtt-alarm.groovy.
+   * mqtt-tts.groovy.
    * Author: Cecil Coupe 
    * Purpose:
-   *  Notification and Speech Synthesis:  text to TTS, sends mp3 to MQTT topic.
-   *    where it is played by some device specific listener on the MQTT topic
-   *  Chimes use a number to pick a sound at the device. 1 is the default. 0 means stop.
+   *  Use a Computers audio system to generate and play a Hubitat tts url.
+   *  Setting device volume with the buttons and then Configure
+   *    saves the volume level. That will be used to override the device
+   *    each time so it appears to be Sticky.
+   *  Save Preference may not save the volume unless Configure button is pressed
+   *    first. It will NOT redisplay the GUI widget's value. Refresh page in Brower.
+   *  Refresh clears the HE volume setting.
    *
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    *  in compliance with the License. You may obtain a copy of the License at:
@@ -19,28 +23,20 @@
    */
    
    /* 
-    * Version 1.0.0 - provides Notification and Speech Synthesis
-    *         2.0.0 - provides Chime and Alarm (siren)
-    *         2.1.0 - settable volume for chime,siren
+    * Version 1.0.0 - July 1, 2020 
+    *                 Speech Synthesis with settable volume
     *
    */
 
 metadata {
-  definition (name: "MQTT Alarm v2.1", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-alarm2.groovy") {
+  definition (name: "Mqtt TTS", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-tts.groovy") {
     capability "Initialize"
     capability "Configuration"
     capability "Refresh"
     capability "SpeechSynthesis"
-    //capability "Notification"
-		capability "Chime"
-    capability "Alarm"
     capability "AudioVolume"
 		
 		attribute "status", "ENUM", ["playing","stopped"]
-		attribute "soundName", "string"
-    attribute "soundEffects", "{1=Doorbell, 2=Siren, 3=Horn, 10=Cops_Arrive, 11=Enjoy}"
-    attribute "alarm", "ENUM", ["strobe", "off", "both", "siren"]
-    attribute "mute", "ENUM", ["unmuted", "muted"]
     attribute "volume", "NUMBER"
   }
 
@@ -61,18 +57,6 @@ metadata {
             title: "TTS Volume 0..100",
             required: false,
             displayDuringSetup:true)
-    input ("chimeName", "enum", title: "Pick a Chime",
-						require: false,
-						options: getSounds(),
-            defaultValue: "1 - Doorbell")
-    input ("volumeChime", "text", defaultValue: "Default",
-            title: "Chime Volume 0..100",
-            required: false,
-            displayDuringSetup:true)
-    input ("volumeSiren", "text", defaultValue: "Default",
-            title: "Siren Volume 0..100",
-            required: false,
-            displayDuringSetup:true)
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
 }
@@ -88,10 +72,6 @@ def getVoices() {
 	return list
 }
 
-def getSounds() {
-  
-  return ["1 - Doorbell", "2 - Siren", "3 - Horn", "10 - Cops_Arrive", "11 - Enjoy"]
-}
 
 def installed() {
     log.info "installed..."
@@ -199,7 +179,7 @@ def configure() {
 
 // refresh Clears tmpVol and settings
 def refresh() {
-  settings.volumeChime = 'Default'
+  settings.volumeTTS = 'Default'
   state.tempVol = null
   sendEvent([name:'tempVol', value: state.tempVol, displayed:true])
   if (logEnable) log.debug "refresh() called"
@@ -215,10 +195,18 @@ def deviceNotification(text) {
 }
 
 def speakpub(text, wrap) {
-  if (state.volumeTTS && state.volumeTTS != 'Default') {
-    log.debug "setting player volume to ${state.volumeTTS}."
+  def tvol = null
+  if (state.tempVol) {
+    tvol = state.tempVol
+    log.debug "using tts state.tempVol ${tvol}"
+  } else if (settings.volumeTTS && settings.volumeTTS != 'Default') {
+    tvol = settings.volumeTTS.toInteger()
+    log.debug "using settings.volumeTTS ${tvol}"
+  }
+  if (tvol) {
+    log.debug "temporary setting tts volume to ${tvol}."
     def topic = "homie/${settings.topicPub}/player/volume/set"
-    interfaces.mqtt.publish(topic, state.volumeTTS.toString(), settings?.QOS.toInteger(), false)
+    interfaces.mqtt.publish(topic, tvol.toString(), settings?.QOS.toInteger(), false)
   }
   if (wrap) {
     text = "<emphasis level=\"strong\">" + text + "</emphasis>"
@@ -228,7 +216,6 @@ def speakpub(text, wrap) {
   def payload = sound.uri
   if (logEnable) {
     log.debug "speak(${text}) => ${payload}"
-    log.debug "publish to: ${urltmp}"
   }
   interfaces.mqtt.publish(urltmp, payload, settings?.QOS.toInteger(), false)
 }
@@ -238,113 +225,38 @@ def playerOff() {
   interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), false)
 }
 
-// ---- Siren -----
-def both() {
-  siren()
-  strobe()
-}
 
-def siren() {
-  def tvol = null
-  if (state.tempVol) {
-    tvol = state.tempVol
-    log.debug "siren settings state.tempVol ${tvol}"
-  } else if (settings.volumeSiren && settings.volumeSiren != 'Default') {
-    tvol = settings.volumeSiren.toInteger()
-    log.debug "siren settings.volumeSiren ${tvol}"
-  }
-  if (tvol) {
-    log.debug "temporary setting siren volume to ${tvol}."
-    def topic = "homie/${settings.topicPub}/siren/volume/set"
-    interfaces.mqtt.publish(topic, tvol.toString(), settings?.QOS.toInteger(), false)
-  }
-  def topic = "homie/${settings.topicPub}/siren/state/set"
-  interfaces.mqtt.publish(topic, "on", settings?.QOS.toInteger(), settings?.retained)
-}
-
-def strobe() {
-  def topic = "homie/${settings.topicPub}/strobe/state/set"
-  interfaces.mqtt.publish(topic, "on", settings?.QOS.toInteger(), settings?.retained)
-}
-
-def alarmOff() {
-  def topic = "homie/${settings.topicPub}/siren/state/set"
-  interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), settings?.retained)
-  topic = "homie/${settings.topicPub}/strobe/state/set"
-  interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), settings?.retained)
-}
-
-// -- chime ---
-def playSound(soundNumber) {
-  def tvol = null
-  if (state.tempVol) {
-    tvol = state.tempVol
-    log.debug "using state.tempVol ${tvol}"
-  } else if (settings.volumeChime && settings.volumeChime != 'Default') {
-    tvol = settings.volumeChime.toInteger()
-    log.debug "using settings.volumeChime ${tvol}"
-  }
-  if (tvol) {
-    log.debug "temporary setting chime volume to ${tvol}."
-    def topic = "homie/${settings.topicPub}/chime/volume/set"
-    interfaces.mqtt.publish(topic, tvol.toString(), settings?.QOS.toInteger(), false)
-  }
-	def topic = "homie/${settings.topicPub}/chime/state/set"
-  // map soundNumber to options string
-  def sndList = getSounds()
-  sndNum = soundNumber.toString()
-  sndEntry = "1 - Doorbell"       // default
-  for (snd in sndList) {
-    flds = snd.split("-")
-    if (flds[0].trim() == sndNum) {
-      sndEntry = snd
-      break
-    }
-  }
-	if (logEnable) {
-		log.debug "publish ${sndEntry} to ${topic}"
-	}
-	interfaces.mqtt.publish(topic, sndEntry, settings?.QOS.toInteger(), false)
-}
-
-// Use the stop button for both Chimes and Siren/Strobe
-def stop() {
-	def topic = "homie/${settings.topicPub}/chime/state/set"
-	if (logEnable) {
-		log.debug "publish 'stop' to ${topic}"
-	}
-	interfaces.mqtt.publish(topic, "off", settings?.QOS.toInteger(), false)
-  alarmOff()
-  playerOff()
-}
-
-// ---- Volume stuff ---- Buttons on the page. NOT Preferences
+// ---- Volume stuff ---- Buttons on the page. NOT Preferences Not attributes
 def setVolume(level) {
   // Displays in 'Current States'
-  tempVol = level
-  sendEvent([name:'tempVol', value: tempVol, displayed:true])
+  state.tempVol = level
+  log.debug "temporarysetting chime volume to ${state.tempVol}."
+  def topic = "homie/${settings.topicPub}/chime/volume/set"
+  interfaces.mqtt.publish(topic, state.tempVol.toString(), settings?.QOS.toInteger(), false)
+  sendEvent([name:'tempVol', value: state.tempVol, displayed:true])
 }
 
 def mute() {
+
 }
 
 def unmute() {
 }
 
 def volumeDown() {
-  if (tempVol && tempVol >= 6) {
-    tempVol -= 5
-    sendEvent([name:'tempVol', value: tempVol, displayed:true])
+  if (state.tempVol && state.tempVol >= 6) {
+    state.tempVol -= 5
+    sendEvent([name:'tempVol', value: state.tempVol, displayed:true])
   }
 }
 
 def volumeUp() {
-  if (tempVol && tempVol <= 95) {
-    tempVol += 5
-    sendEvent([name:'tempVol', value: tempVol, displayed:true])
+  if (state.tempVol && state.tempVol <= 95) {
+    state.tempVol += 5
+    sendEvent([name:'tempVol', value: state.tempVol, displayed:true])
   }
 }
 
 def off() {
-  stop()
+  playerOff()
 }
