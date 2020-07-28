@@ -154,6 +154,7 @@ def logsOff(){
 // Hubitat GUI state and Rule Machine
 def on() {
  sendEvent(name: "switch", value: "on")
+ sendEvent(name: "progress", value: "0", displayed: true)
 }
 
 def off() {
