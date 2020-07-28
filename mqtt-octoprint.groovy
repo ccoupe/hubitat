@@ -78,13 +78,13 @@ def parse(String description) {
     def pr_vals = parser.parseText(payload)
     if (evt_name == "PrintStarted") {
       sendEvent(name: "switch", value: "on")
-      if pr_vals['path'] {
-        sendEvent(name: "file", values: pr_vals['path'])
+      if (pr_vals['path']) {
+        sendEvent(name: "file", values: pr_vals['path'], displayed: true)
       }
     } else if (evt_name == "PrintDone" || evt_name == "PrintFailed") {
       sendEvent(name: "switch", value: "off")
-      if pr_vals['path'] {
-        sendEvent(name: "file", values: pr_vals['path'])
+      if (pr_vals['path']) {
+        sendEvent(name: "file", values: pr_vals['path'], displayed: true)
       }
     }
   } 
