@@ -24,9 +24,9 @@ import groovy.json.JsonSlurper
 import java.util.GregorianCalendar
 
 metadata {
-  definition (name: "MQTT Octoprint Monitor", namespace: "ccoupe", 
+  definition (name: "Mqtt Octoprint Monitor", namespace: "ccoupe", 
       author: "Cecil Coupe", 
-      importURL: "https://raw.githubusercontent.com/ccoupe/mqtt-camera-motion/master/mqtt-octoprint.groovy"
+      importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-octoprint.groovy"
     ) {
     capability "Initialize"
     capability "Switch" 
@@ -34,6 +34,7 @@ metadata {
     attribute "switch","ENUM",["on","off"]
     attribute "progress", "number"
     attribute "status", "string"
+    attribute "file", "string"
   
  }
 
@@ -74,10 +75,17 @@ def parse(String description) {
   } else if (topic.startsWith("${settings?.topicSub}/event")) {
     evt_name = topic.split('/')[-1]
     sendEvent(name: 'status', value: evt_name, displayed: true)
+    def pr_vals = parser.parseText(payload)
     if (evt_name == "PrintStarted") {
       sendEvent(name: "switch", value: "on")
+      if pr_vals['path'] {
+        sendEvent(name: "file", values: pr_vals['path'])
+      }
     } else if (evt_name == "PrintDone" || evt_name == "PrintFailed") {
       sendEvent(name: "switch", value: "off")
+      if pr_vals['path'] {
+        sendEvent(name: "file", values: pr_vals['path'])
+      }
     }
   } 
 }
