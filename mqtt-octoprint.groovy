@@ -75,16 +75,23 @@ def parse(String description) {
   } else if (topic.startsWith("${settings?.topicSub}/event")) {
     evt_name = topic.split('/')[-1]
     sendEvent(name: 'status', value: evt_name, displayed: true)
-    def pr_vals = parser.parseText(payload)
     if (evt_name == "PrintStarted") {
+      def pr_vals = parser.parseText(payload)
       sendEvent(name: "switch", value: "on")
+      //log.info "start payload: ${pr_vals}"
       if (pr_vals['path']) {
-        sendEvent(name: "file", values: pr_vals['path'], displayed: true)
+        path = pr_vals['path']
+        //log.info "start name: ${pr_vals['name']} path: ${path}"
+        sendEvent(name: "file", value: path, displayed: true)
       }
     } else if (evt_name == "PrintDone" || evt_name == "PrintFailed") {
+      def pr_vals = parser.parseText(payload)
       sendEvent(name: "switch", value: "off")
+      //log.info "stop payload: ${pr_vals}"
       if (pr_vals['path']) {
-        sendEvent(name: "file", values: pr_vals['path'], displayed: true)
+        path = pr_vals['path']
+        //log.info "stop name: ${pr_vals['name']} path: ${path}"
+        sendEvent(name: "file", value: path, displayed: true)
       }
     }
   } 
