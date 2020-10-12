@@ -46,7 +46,7 @@ metadata {
     attribute "soundName", "string"
     attribute "soundEffects", "{1=Doorbell, 2=Siren, 3=Horn, 10=Cops_Arrive, 11=Enjoy}"
     
-    command "register"
+    //command "register"
     
   }
 
@@ -279,6 +279,7 @@ def stop() {
   alarmOff()
 }
 
+/*
 def register() {
     def topic = "homie/${settings.topicPub}/control/cmd/set"
   def map = [:]
@@ -287,3 +288,4 @@ def register() {
   interfaces.mqtt.publish(topic, json, settings?.QOS.toInteger(), settings?.retained)
   if (logEnable) log.info "Mycroft: ${json} -> ${topic}"
 }
+*/
