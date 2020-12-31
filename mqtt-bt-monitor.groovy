@@ -12,12 +12,10 @@
    * ------------------------------------------------------------------------------------------------------------------------------
    *
    * Purpose
-   *    Monitors Octoprints MQTT topics for 3D printer status.
-   *    Sets a switch for Started, Stopped (or Failed) for use in Rules. 
-   *    shows % done print progress.
-   *    Note: monitoring temperatures may send Hubitat too much, too fast.
-   *      so I don't subscribe to that.
-   *  
+   *    Monitors  MQTT topics for bluetooth monitor presence.
+   *    The bluetooth monitor runs on a pi with BT and a mqtt connection
+   *    This Hubitat driver just picks one entry (mqtt subtopic) to watch
+   *    for. The real moniter code is 'bash'!. Yes, bash. 
    */
 
 import groovy.json.JsonSlurper 
@@ -41,11 +39,8 @@ metadata {
     input name: "password", type: "password", title: "MQTT Password:",
         description: "(blank if none)", required: false, displayDuringSetup: true
     input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
-        description: "Example Topic (bt-monitor/lost_pi). Please don't use a #", 
+        description: "Ex: bt-monitor/lost_pi/my_iphone or../USE:MAC:IF:NO:NAME:GIVE", 
         required: true, displayDuringSetup: true
-    input name: "devName", type: "text", title: "Device Name",
-        description: "Name or USE:MAC:IF:NO:NAME:GIVEN", required: true, 
-        displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, 
         defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required:false,
@@ -67,8 +62,9 @@ def parse(String description) {
   def parser = new JsonSlurper()
   if (topic == "${settings?.topicSub}" && payload.startsWith('{')) {
     def pr_vals = parser.parseText(payload)
-    if (pr_vals[settings.devName]) {
+    if (pr_vals) {
       def cf = pr_vals['confidence']
+      if (logEnable) log.info "${settings?.topicSub} confidence is ${cf}"
       if (cf == "100") {
         sendEvent(name: "presenceSensor", value: "present")
       } else if (cf == "0") {
@@ -89,7 +85,7 @@ def uninstalled() {
 }
 
 def initialize() {
-	if (logEnable) runIn(900,debugOff) // clears debugging after 900 secs 
+	//if (logEnable) runIn(900,debugOff) // clears debugging after 900 secs 
   if (logEnable) log.info "Initalize..."
 	try {
     def mqttInt = interfaces.mqtt
@@ -99,10 +95,7 @@ def initialize() {
     //give it a chance to start
     pauseExecution(1000)
     log.info "Connection established"
-    def topic = "${settings?.topicSub}/event/#"
-    mqttInt.subscribe(topic)
-		if (logEnable) log.debug "Subscribed to: ${topic}"
-    topic = "${settings?.topicSub}/progress/printing"
+    def topic = "${settings?.topicSub}"
     mqttInt.subscribe(topic)
 		if (logEnable) log.debug "Subscribed to: ${topic}"
   } catch(e) {
