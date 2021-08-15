@@ -28,6 +28,8 @@ metadata {
     ) {
     capability "Initialize"
     capability "PresenceSensor"
+    command "Arrived"
+    command "Departed"
    
  }
 
@@ -66,12 +68,22 @@ def parse(String description) {
       def cf = pr_vals['confidence']
       if (logEnable) log.info "${settings?.topicSub} confidence is ${cf}"
       if (cf == "100") {
-        sendEvent(name: "presenceSensor", value: "present")
+        arrived()
       } else if (cf == "0") {
-        sendEvent(name: "presenceSensor", value: "not present")
+        departed()
       }
     }
   } 
+}
+
+def arrived() {
+  sendEvent(name: "presence", value: "present", linkText: deviceName, descriptionText: descriptionText)
+  //sendEvent(name: "presence", value: "present")
+}
+
+def departed() {
+  sendEvent(name: "presence", value: "not present", linkText: deviceName, descriptionText: descriptionText)
+  //sendEvent(name: "presence", value: "not present")
 }
 
 def updated() {

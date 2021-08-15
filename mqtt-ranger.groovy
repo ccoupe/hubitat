@@ -24,6 +24,9 @@ metadata {
     capability "Configuration"
     capability "Refresh"
     capability "PresenceSensor"
+
+    command "Arrived"
+    command "Departed"
   }
 
   preferences {
@@ -63,10 +66,10 @@ def parse(String description) {
     if ((dist > (settings?.presenceDist - settings?.tolerance)) &&
         (dist < (settings?.presenceDist + settings?.tolerance))) {
       log.info "${device}: is present ${dist}"
-      sendEvent(name: "presenceSensor", value: "present")
+      arrived()
     } else {
       log.info "${device}: is not present ${dist}"
-      sendEvent(name: "presenceSensor", value: "not present")
+      departed()
     }
   }
 }
@@ -137,6 +140,13 @@ def logsOff(){
   device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
+def arrived() {
+  sendEvent(name: "presence", value: "present", linkText: deviceName, descriptionText: descriptionText)
+}
+
+def departed() {
+  sendEvent(name: "presence", value: "not present", linkText: deviceName, descriptionText: descriptionText)
+}
 
 def refresh() {
 }
