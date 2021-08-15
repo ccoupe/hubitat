@@ -21,8 +21,6 @@
     * Version 3.2 - March 24, 2020 
             - enable/disable. 
             - select ML algorithm
-      Version 3.3 - Jun ??, 2020 - move face/body detect to a cmd setting
-          and not a per event cycle.
    */
 
 metadata {
@@ -36,6 +34,8 @@ metadata {
 
     command "enable"
     command "disable"
+    command "set_Inactive"
+    command "set_Active"
        
     attribute "motion", "string"
     attribute "motion","ENUM",["active","inactive"]
@@ -254,6 +254,14 @@ def disable() {
     if (logEnable) log.debug " ${topic} ${det}"
     interfaces.mqtt.publish(topic, "disable", settings?.QOS.toInteger(), settings?.retained)
   }
+}
+
+def set_Active() {
+  sendEvent(name: "motion", value: "active")
+}
+
+def set_Inactive() {
+  sendEvent(name: "motion", value: "inactive")
 }
 
 def request_detect() {

@@ -23,8 +23,10 @@
    /* 
     * Version 1.0.0 - provides Notification and Speech Synthesis
     * Version 2.0.0 
-          - uses Mycroft for TTS, not amazon
-          - implements Alarm: Siren and Strobe (matching device might not strobe)
+    *      - uses Mycroft for TTS, not amazon
+    *     - implements Alarm: Siren and Strobe (matching device might not strobe)
+    * Version 2.0.1 - Can turn Alarm off via MQTT message to us or button push
+    *        will trigger Rule Machine rules. Only 1 button and only 'pushed'
    */
    
 import groovy.json.JsonOutput
@@ -39,6 +41,7 @@ metadata {
     capability "Switch"
     capability "Alarm"
     capability "Chime"
+    capability "PushableButton"
 		
     attribute "switch","ENUM",["on","off"]
     attribute "alarm","ENUM",["strobe", "off", "both", "siren"]
@@ -46,7 +49,7 @@ metadata {
     attribute "soundName", "string"
     attribute "soundEffects", "{1=Doorbell, 2=Siren, 3=Horn, 10=Cops_Arrive, 11=Enjoy}"
     
-    //command "register"
+    command "push"
     
   }
 
@@ -110,6 +113,12 @@ def parse(String description) {
     } else {
       log.info "TB unhandled ${topic} ${payload}"
     }
+  } else if (topic == "homie/${settings.topicPub}/control/cmd") {
+    if (payload.contains("on")){
+      // Probably from the display panel code
+      log.info("MQTT pushes TB_Cancel")
+      push(1)
+    } 
   }
 }
 
@@ -138,6 +147,8 @@ def initialize() {
     log.info "Connection established"
     def topic = "homie/${settings.topicPub}/\$state"
 		if (logEnable) log.debug "Subscribed to: ${topic}"
+    mqttInt.subscribe(topic)
+    topic = "homie/${settings.topicPub}/control/cmd"
     mqttInt.subscribe(topic)
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
@@ -187,6 +198,7 @@ def refresh() {
 // Pass along the choice of cameras
 def configure() {
   log.info "Configure.."
+  sendEvent(name: "numberOfButtons", value: 1, displayed: false)
   // init TrumpBear with camera choice
   def topic = "homie/${settings.topicPub}/control/cmd/set"
   def map = [:]
@@ -279,13 +291,18 @@ def stop() {
   alarmOff()
 }
 
-/*
-def register() {
-    def topic = "homie/${settings.topicPub}/control/cmd/set"
+def push(btn) {
+  btn = 1     // yes, I am overriding user preference
+  if (logEnable) log.info "TB_Cancel  on"
+  // the Event will trigger any Hubitat Rules. isStateChange is required
+  // to fire more than once. 
+  sendEvent(name: "pushed", value: btn.toInteger(), isStateChange:  true)
+  // Tell trumpy_bear to quit what it's doing, if anything
+  def topic = "homie/${settings.topicPub}/control/cmd/set"
   def map = [:]
-  map['cmd'] = 'register'
-  def json = JsonOutput.toJson(map)
-  interfaces.mqtt.publish(topic, json, settings?.QOS.toInteger(), settings?.retained)
-  if (logEnable) log.info "Mycroft: ${json} -> ${topic}"
+  map['cmd'] = 'end'
+  payload = JsonOutput.toJson(map)
+  if (logEnable) log.info "${topic} ${payload}"
+  interfaces.mqtt.publish(topic, payload, 1, false)
 }
-*/
+

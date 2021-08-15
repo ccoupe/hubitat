@@ -15,16 +15,17 @@
    *  Changes:
    *
    *  1.0.0 - Initial release
-   *  requests Trumpy Bear front panel App to go into 'registration' mode
-   *    does not listen to mqtt topics. 
+   *  listens on [homie/trumpy_bear/control/cmd for 'on' (begin cancel)
+   *      If this was a pushbutton we could put all the code in mqtt_trumpy.groovy.
+   *      Hint. Hint.
    */
-   
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper 
 
 metadata {
-		definition (name: "Mqtt Trumpy Register Switch", namespace: "ccoupe", 
+		definition (name: "Mqtt Trumpy Cancel Switch", namespace: "ccoupe", 
 			author: "Cecil Coupe", 
-			importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/trumpy-register-switch.groovy") {
+			importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/trumpy-cancel-switch.groovy") {
 				capability "Initialize"
 				capability "Switch"
 				
@@ -55,7 +56,7 @@ metadata {
 	      title: "Seconds to Off",
 	      required: false,
 	      displayDuringSetup: true,
-	      defaultValue: 1,
+	      defaultValue: 30,
 	      description: "Seconds until auto turning off"
 	      )
       input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
@@ -73,7 +74,15 @@ def parse(String description) {
 	payload = interfaces.mqtt.parseMessage(description).payload
   
   if (logEnable) log.info "on message: ${topic} : ${payload}"
-  subTopic = "${settings?.topicSub}/screen/control"
+  subTopic = "${settings?.topicSub}/control/cmd"
+  if (topic == subTopic) {
+    if (payload.contains("on")){
+      log.info("MQTT sets TB_Cancel_Switch")
+      on()
+    } else if (payload.contains('off')){
+      off()
+    }
+  }
 }
 
 
@@ -101,9 +110,9 @@ def initialize() {
         //give it a chance to start
         pauseExecution(1000)
         log.info "Connection established"
-        //topic = "${settings?.topicSub}/screen/control"
-        //if (logEnable) log.debug "Subscribed to: ${topic}"
-        //mqttInt.subscribe(topic)
+        topic = "${settings?.topicSub}/control/cmd"
+        if (logEnable) log.debug "Subscribed to: ${topic}"
+        mqttInt.subscribe(topic)
           
     } catch(e) {
         if (logEnable) log.debug "Initialize error: ${e.message}"
@@ -153,20 +162,19 @@ def logsOff(){
 
 
 def on() {
-  if (logEnable) log.info "${settings?.topicSub} Screen on"
-  if (AutoOff) {
-        runIn(settings.offSecs.toInteger(), off)
-  }
-	sendEvent(name: "switch", value: "on")
-  topic = "${settings?.topicSub}/screen/control/set"
+  if (logEnable) log.info "TB_Cancel  on"
+  // the Event will trigger any Hubitat Rules.
+  sendEvent(name: "switch", value: "on")
+  // Tell trumpy_bear to quit what it's doing, if anything
+  def topic = "${settings.topicSub}/control/cmd/set"
   def map = [:]
-  map['cmd'] = 'register'
+  map['cmd'] = 'end'
   payload = JsonOutput.toJson(map)
   if (logEnable) log.info "${topic} ${payload}"
   interfaces.mqtt.publish(topic, payload, 1, false)
 }
 
 def off() {
-  if (logEnable) log.info "Register Auto off"
-	sendEvent(name: "switch", value: "off")
+  if (logEnable) log.info "TB_Cancel off"
+  sendEvent(name: "switch", value: "off")
 }
