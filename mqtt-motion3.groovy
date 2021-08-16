@@ -30,12 +30,15 @@ metadata {
     capability "Configuration"
     capability "Refresh"
 		capability "Switch"     // not all devices implement this. That's OK
-
+    capability "PresenceSensor"
 
     command "enable"
     command "disable"
     command "set_Inactive"
     command "set_Active"
+    command "arrived"
+    command "departed"
+
        
     attribute "motion", "string"
     attribute "motion","ENUM",["active","inactive"]
@@ -63,6 +66,11 @@ metadata {
             require: false, 
             displayDuringSetup:true,
             options: algo_list_map(), defaultValue: "None")
+    input name: "providePresence", 
+      type: "bool",
+      title: "Provide Presense",
+      required: true, 
+      defaultValue: false 
     input name: "capDelay", type: "number", title: "Delay Capture",
         required: false, displayDuringSetup: true, defaultValue: 5,
         description: "Number of seconds to wait for video capture"
@@ -95,20 +103,24 @@ def parse(String description) {
         runIn(delay, request_detect)
       } else {
         sendEvent(name: "motion", value: "active")
+        arrived()
       }
     } else if (payload.startsWith("inactive") || payload=="false") {
       if (settings?.detect && settings?.detect != 'None') {
         request_detect()
       } else {
         sendEvent(name: "motion", value: "inactive")
+        departed()
       }
     }
   } else if (topic.endsWith("control")) {
     log.info "${device} ML Detection is ${payload}"
     if (payload=="true") {
       sendEvent(name: "motion", value: "active")
+      arrived()
     } else if (payload=="false") {
       sendEvent(name: "motion", value: "inactive")
+      departed()
     } else {
       log.warn "unknown payload on ${topic}"
     }
@@ -197,7 +209,7 @@ def logsOff(){
   device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
-// Do nothing for now - 
+
 // unsub/resub to property topic - cause parse to run ?
 def refresh() {
   if (settings?.propertySub) {
@@ -262,6 +274,18 @@ def set_Active() {
 
 def set_Inactive() {
   sendEvent(name: "motion", value: "inactive")
+}
+
+def arrived() {
+  if (settings?.providePresence) {
+    sendEvent(name: "presence", value: "present", linkText: deviceName, descriptionText: descriptionText)
+  }
+}
+
+def departed() {
+  if (settings?.providePresence) {
+    sendEvent(name: "presence", value: "not present", linkText: deviceName, descriptionText: descriptionText)
+  }
 }
 
 def request_detect() {
