@@ -1,6 +1,9 @@
 /**
-   * mqtt-ranger.groovy.
-   * Author: Cecil Coupe - derived from sample codes from many others.
+   * mqtt-alarm.groovy.
+   * Author: Cecil Coupe 
+   * Purpose:
+   *  Notification and Speech Synthesis:  text to TTS, sends mp3 to MQTT topic.
+   *    where it is played by some device specific listener on the MQTT topic
    *
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
    *  in compliance with the License. You may obtain a copy of the License at:
@@ -15,69 +18,43 @@
    */
    
    /* 
-    * Uses json for configuration messages
-    */
+    * Version 1.0.0 - provides Notification (text)
+   */
 
 metadata {
-  definition (name: "Mqtt Ranger", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-ranger.groovy") {
+  definition (name: "Mqtt Notify", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-notify.groovy") {
     capability "Initialize"
     capability "Configuration"
     capability "Refresh"
-    capability "PresenceSensor"
-
-    command "Arrived"
-    command "Departed"
+    capability "Notification"
+		
   }
 
   preferences {
     input name: "MQTTBroker", type: "text", title: "MQTT Broker Address:", required: true, displayDuringSetup: true
     input name: "username", type: "text", title: "MQTT Username:", description: "(blank if none)", required: false, displayDuringSetup: true
     input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false, displayDuringSetup: true
-    input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
-        description: "Example: homie/garage/ranger/distance",
-        required: true, displayDuringSetup: true
+    input name: "topicPub", type: "text", title: "Topic to Publish:", 
+        description: "Example: homie/test_display/display/text/set",
+        required: false, displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required: false, defaultValue: false, displayDuringSetup: true
-    input name: "delayFor", type: "number", title: "Check every",
-        required: true, displayDuringSetup: true, defaultValue: 60,
-        description: "Number of seconds to wait before checking. 65K max"
-    input name: "presenceDist", type: "number", title: "Distance",
-        required: true, displayDuringSetup: true, defaultValue: 120,
-        description: "Distance for 'Present' in cm"
-    input name: "tolerance", type: "number", title: "Tolerance",
-        required: true, displayDuringSetup: true, defaultValue: 2,
-        description: "plus or minus this value (cm)"
-   input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
+    input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
 }
+
 
 
 def installed() {
     log.info "installed..."
 }
 
-// Parse incoming device messages (distance) generate events
+// Parse incoming device messages to generate events
+// There are none. Output only
 def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
-  if (topic == settings?.topicSub && payload != "") {
-    def dist = payload.toInteger()
-    if (dist < 50) {
-        // less than 50cm is a device error? 
-        log.info "${device} ingnoring ${dist}"
-    } else if ((dist > (settings?.presenceDist - settings?.tolerance)) &&
-        (dist < (settings?.presenceDist + settings?.tolerance))) {
-      log.info "${device}: is present ${dist}"
-      arrived()
-    } else {
-      log.info "${device}: is not present ${dist}"
-      departed()
-    }
-  } else {
-    log.info "ranger: unknown message: ${topic} => ${payload}"
-  }
-  
 }
 
 
@@ -102,10 +79,9 @@ def initialize() {
     mqttInt.connect(mqttbroker, "hubitat_${device}", settings?.username,settings?.password)
     //give it a chance to start
     pauseExecution(200)
-    def topicTop = "${settings?.topicSub}"
     log.info "Connection established"
-		if (logEnable) log.debug "Subscribed to: ${topicTop}"
-    mqttInt.subscribe(topicTop)
+		//if (logEnable) log.debug "Subscribed to: ${topicTop}"
+    //mqttInt.subscribe(topicTop)
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
@@ -146,44 +122,14 @@ def logsOff(){
   device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
-def arrived() {
-  sendEvent(name: "presence", value: "present", linkText: deviceName, descriptionText: descriptionText)
-}
-
-def departed() {
-  sendEvent(name: "presence", value: "not present", linkText: deviceName, descriptionText: descriptionText)
-}
-
+// Do nothing.
 def refresh() {
+    if (logEnable) log.debug "nothing to do for refresh"
 }
 
-// send the delayFor value to the ESP32 (EEPROM)
-def configure() {
-  log.info "Configure.."
-  if (settings?.topicSub) {
-    def urltmp = "${settings?.topicSub}/set"
-    def jstr = "{\"period\": ${settings?.delayFor.toInteger()}}"
-    interfaces.mqtt.publish(urltmp, jstr, settings?.QOS.toInteger(), false)
-    if (logEnable) log.debug "setting ${urltmp} to ${jstr}"
-    //sendEvent(name: "delayFor", value: settings?.delayFor, displayed: true);
+def deviceNotification(text) {
+  if (logEnable) {
+    log.debug "send ${text} => ${settings.topicPub}"
   }
+  interfaces.mqtt.publish("${settings.topicPub}", text, settings?.QOS.toInteger(), false)
 }
-
-
-def enable() {
-  if (settings.isCamera) {
-    def topic = "${settings?.topicSub}/control/set"
-    if (logEnable) log.debug " ${topic} ${det}"
-    interfaces.mqtt.publish(topic, "enable", settings?.QOS.toInteger(), settings?.retained)
-  }
-}
-
-def disable() {
-  if (settings.isCamera) {
-    def topic = "${settings?.topicSub}/control/set"
-    if (logEnable) log.debug " ${topic} ${det}"
-    interfaces.mqtt.publish(topic, "disable", settings?.QOS.toInteger(), settings?.retained)
-  }
-}
-
-

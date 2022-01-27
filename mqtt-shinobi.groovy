@@ -17,16 +17,13 @@
    /* 
     * Uses json for configuration messages
     */
+import groovy.json.JsonSlurper 
 
 metadata {
-  definition (name: "Mqtt Ranger", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-ranger.groovy") {
+  definition (name: "Mqtt Shinobi", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-shinobi.groovy") {
     capability "Initialize"
     capability "Configuration"
     capability "Refresh"
-    capability "PresenceSensor"
-
-    command "Arrived"
-    command "Departed"
   }
 
   preferences {
@@ -34,10 +31,11 @@ metadata {
     input name: "username", type: "text", title: "MQTT Username:", description: "(blank if none)", required: false, displayDuringSetup: true
     input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false, displayDuringSetup: true
     input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
-        description: "Example: homie/garage/ranger/distance",
+        description: "Example: shinobi",
         required: true, displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required: false, defaultValue: false, displayDuringSetup: true
+    /*
     input name: "delayFor", type: "number", title: "Check every",
         required: true, displayDuringSetup: true, defaultValue: 60,
         description: "Number of seconds to wait before checking. 65K max"
@@ -47,6 +45,7 @@ metadata {
     input name: "tolerance", type: "number", title: "Tolerance",
         required: true, displayDuringSetup: true, defaultValue: 2,
         description: "plus or minus this value (cm)"
+    */
    input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
   }
 }
@@ -61,23 +60,18 @@ def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
-  if (topic == settings?.topicSub && payload != "") {
-    def dist = payload.toInteger()
-    if (dist < 50) {
-        // less than 50cm is a device error? 
-        log.info "${device} ingnoring ${dist}"
-    } else if ((dist > (settings?.presenceDist - settings?.tolerance)) &&
-        (dist < (settings?.presenceDist + settings?.tolerance))) {
-      log.info "${device}: is present ${dist}"
-      arrived()
-    } else {
-      log.info "${device}: is not present ${dist}"
-      departed()
+  //log.info "Shinobi mqtt: ${topic} ${payload}"
+  if (topic == settings?.topicSub && payload.startsWith('{')) {
+    def parser = new JsonSlurper()
+    def dist = parser.parseText(payload)
+    //log.info "Shinobi details: ${dist['details']}"
+    dt = dist['details']
+    if (dt['reason'] == 'object') {
+      dt['matrices'].each {
+        log.info "Found ${it['tag']} ${it['confidence']}"
+      }
     }
-  } else {
-    log.info "ranger: unknown message: ${topic} => ${payload}"
   }
-  
 }
 
 
@@ -146,13 +140,6 @@ def logsOff(){
   device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
-def arrived() {
-  sendEvent(name: "presence", value: "present", linkText: deviceName, descriptionText: descriptionText)
-}
-
-def departed() {
-  sendEvent(name: "presence", value: "not present", linkText: deviceName, descriptionText: descriptionText)
-}
 
 def refresh() {
 }
@@ -161,29 +148,15 @@ def refresh() {
 def configure() {
   log.info "Configure.."
   if (settings?.topicSub) {
+     /*
     def urltmp = "${settings?.topicSub}/set"
     def jstr = "{\"period\": ${settings?.delayFor.toInteger()}}"
     interfaces.mqtt.publish(urltmp, jstr, settings?.QOS.toInteger(), false)
     if (logEnable) log.debug "setting ${urltmp} to ${jstr}"
     //sendEvent(name: "delayFor", value: settings?.delayFor, displayed: true);
+   */
   }
 }
 
-
-def enable() {
-  if (settings.isCamera) {
-    def topic = "${settings?.topicSub}/control/set"
-    if (logEnable) log.debug " ${topic} ${det}"
-    interfaces.mqtt.publish(topic, "enable", settings?.QOS.toInteger(), settings?.retained)
-  }
-}
-
-def disable() {
-  if (settings.isCamera) {
-    def topic = "${settings?.topicSub}/control/set"
-    if (logEnable) log.debug " ${topic} ${det}"
-    interfaces.mqtt.publish(topic, "disable", settings?.QOS.toInteger(), settings?.retained)
-  }
-}
 
 

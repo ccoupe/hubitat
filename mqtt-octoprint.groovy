@@ -48,6 +48,9 @@ metadata {
     input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
         description: "Example Topic (octoprint). Please don't use a #", 
         required: true, displayDuringSetup: true
+    input name: "topicNotify", type: "text", title: "Topic to Notify:", 
+        description: "Optional text display device", 
+        required: false, displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, 
         defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required:false,
@@ -66,11 +69,17 @@ def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
+  if (logEnable) log.info "${topic} => ${payload}"
   def parser = new JsonSlurper()
   if (topic == "${settings?.topicSub}/progress/printing") {
       def pr_vals = parser.parseText(payload)
       if (pr_vals['progress']) {
         sendEvent(name: "progress", value: pr_vals['progress'], displayed: true)
+        if (settings?.topicNotify) {
+          // display only handles 7.5 chars [word] width
+          def nm = fixlen(settings?.topicSub, 7)
+          send_note(nm+" "+pr_vals['progress'].toString()+"%");
+        }
       }
   } else if (topic.startsWith("${settings?.topicSub}/event")) {
     evt_name = topic.split('/')[-1]
@@ -93,8 +102,19 @@ def parse(String description) {
         //log.info "stop name: ${pr_vals['name']} path: ${path}"
         sendEvent(name: "file", value: path, displayed: true)
       }
+      if (settings?.topicNotify) {
+          send_note(fixlen(settings?.topicSub,7)+" "+evt_name.substring(5));
+      }
     }
   } 
+}
+
+// keep string to maxl characters
+def fixlen(str, maxl) {
+  def len = str.length()
+  if (len > maxl) len = maxl
+  return str.substring(0, len)
+ 
 }
 
 def updated() {
@@ -174,4 +194,8 @@ def on() {
 
 def off() {
  sendEvent(name: "switch", value: "off")
+}
+
+def send_note(msg) {
+  interfaces.mqtt.publish(settings?.topicNotify, msg, settings?.QOS.toInteger(), false)
 }
