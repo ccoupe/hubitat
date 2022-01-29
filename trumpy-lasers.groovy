@@ -28,6 +28,10 @@ metadata {
 				
 				attribute "switch","ENUM",["on","off"]
         command "exec", ["string"]
+        command "Laser_on"
+        command "Laser off"
+        command "Pan", ["integer"]
+        command "Tilt", ["integer"]
 		 }
 
 		preferences {
@@ -228,4 +232,24 @@ def exec(String cmd) {
   if (logEnable) log.info "Laser exec ${cmd}"
   topic = "homie/${settings?.topicSub}/control/set"
   interfaces.mqtt.publish(topic, cmd, 1, false)
+}
+
+def Laser_on() {
+  topic = "homie/${settings?.topicSub}/control/set"
+  interfaces.mqtt.publish(topic, "{\"power\": 100}", 1, false)
+}
+
+def Laser_off() {
+  topic = "homie/${settings?.topicSub}/control/set"
+  interfaces.mqtt.publish(topic, "{\"power\": 0}", 1, false)
+}
+
+def Pan(Integer degrees) {
+  topic = "homie/${settings?.topicSub}/control/set"
+  interfaces.mqtt.publish(topic, "{\"pan\": $degrees}", 1, false)
+}
+
+def Tilt(Integer degrees) {
+  topic = "homie/${settings?.topicSub}/control/set"
+  interfaces.mqtt.publish(topic, "{\"tilt\": $degrees}", 1, false)
 }
