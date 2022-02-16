@@ -51,6 +51,9 @@ metadata {
     input name: "topicNotify", type: "text", title: "Topic to Notify:", 
         description: "Optional text display device", 
         required: false, displayDuringSetup: true
+    input name: "secondPub", type: "text", title: "Second Topic:", 
+        description: "Example: homie/pi4_display/display/text/set",
+        required: false, displayDuringSetup: true
     input name: "QOS", type: "text", title: "QOS Value:", required: false, 
         defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required:false,
@@ -81,6 +84,10 @@ def parse(String description) {
           send_note(nm+" "+pr_vals['progress'].toString()+"%");
         }
       }
+  } else if (topic == "${settings?.topicSub}/PSU/switch/set") {
+      // Octoprint via Cura and PSU Control/MQTT wants us to turn the outlet (PSU) and lamp on.
+      if (payload == "on") on()
+      else off()
   } else if (topic.startsWith("${settings?.topicSub}/event")) {
     evt_name = topic.split('/')[-1]
     sendEvent(name: 'status', value: evt_name, displayed: true)
@@ -144,6 +151,9 @@ def initialize() {
     topic = "${settings?.topicSub}/progress/printing"
     mqttInt.subscribe(topic)
 		if (logEnable) log.debug "Subscribed to: ${topic}"
+    topic = "${settings?.topicSub}/PSU/switch/set"
+    mqttInt.subscribe(topic)
+		if (logEnable) log.debug "Subscribed to: ${topic}"
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
@@ -198,4 +208,6 @@ def off() {
 
 def send_note(msg) {
   interfaces.mqtt.publish(settings?.topicNotify, msg, settings?.QOS.toInteger(), false)
+  if (settings?.secondPub) 
+    interfaces.mqtt.publish(settings?.secondPub, msg, settings?.QOS.toInteger(), false)
 }
