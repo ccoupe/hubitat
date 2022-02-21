@@ -14,11 +14,10 @@
    * Purpose
    *    Monitors Octoprints MQTT topics for 3D printer status.
    *    Sets a switch for Started, Stopped (or Failed) for use in Rules. 
-   *    shows % done print progress.
+   *    shows % done print progress. Passes status as notifications.
    *   
    *  NOTE:
-   *  1. requires these plugins [] in Octoprint and that ''
-   *    be set to ..
+   *  1. See README-Octoprint.md for instructions and restrictions.
    *  2. temperature changes are too chatty for Hubitat, IMO. They are
    *    not tracked.
    */
@@ -52,14 +51,6 @@ metadata {
     input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
         description: "Example Topic (octoprint). Please don't use a #", 
         required: true, displayDuringSetup: true
-    /*
-    input name: "topicNotify", type: "text", title: "Topic to Notify:", 
-        description: "Optional text display device", 
-        required: false, displayDuringSetup: true
-    input name: "secondPub", type: "text", title: "Second Topic:", 
-        description: "Example: homie/pi4_display/display/text/set",
-        required: false, displayDuringSetup: true
-    */
     input name: "QOS", type: "text", title: "QOS Value:", required: false, 
         defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required:false,
@@ -68,7 +59,8 @@ metadata {
     input ("notifyLevel", "enum", title: "Notify Level",
             require: false, 
             displayDuringSetup:true,
-            options: getPrintLevels(), defaultValue: "1% - level")
+            options: getPrintLevels(), 
+            defaultValue: "1% - level")
 
  }
 }
@@ -230,8 +222,6 @@ def logsOff(){
   device.updateSetting("logEnable",[value:"false",type:"bool"])
 }
 
-// We do NOT control the printer via mqtt. These methods are for
-// Hubitat GUI state and Rule Machine
 def on() {
  sendEvent(name: "switch", value: "on")
  sendEvent(name: "progress", value: "0", displayed: true)
@@ -242,15 +232,10 @@ def off() {
 }
 
 void deviceNotification(text) {
-   logDebug("Received notification, creating event. Text: ${text}")
+   if (logEnable) log.debug("Received notification, creating event. Text: ${text}")
    sendEvent(name: "deviceNotification", value: text, isStateChange: true)
 }
 
 def send_note(msg) {
   sendEvent(name: "deviceNotification", value: msg, isStateChange: true)
-  /*
-  interfaces.mqtt.publish(settings?.topicNotify, msg, settings?.QOS.toInteger(), false)
-  if (settings?.secondPub) 
-    interfaces.mqtt.publish(settings?.secondPub, msg, settings?.QOS.toInteger(), false)
-  */
 }

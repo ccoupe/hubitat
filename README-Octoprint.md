@@ -65,8 +65,20 @@ load. You could run it on the some machine you have octoprint on - you just need
 to get command line access to your octoprint (google it) - not hard to do.
 
 Then `sudo apt install mosquitto-clients`
+I do not use login names and passwords with my broker. Too much typing for
+false security, IMO. Hint: you don't have to configure MQTT but you do it your
+way. 
 
 **You want a static IP for your MQTT Broker machine.** Really. go do it.
+Mine is 192.168.1.3 (aka 'stoic.local' in my mdns) 
+**Hubitat doesn't like dns names in MQTT**.
+
+Rumor is Mosquitto can be installed on Windows. I'd bet homebrew would
+do it on OSX. Don't care. Octoprint needs to run 24x7, a small Pi running a
+linux is already in your network. There is no maintenance - I've never had to
+look at the logs - really! OK, maybe once when there was a login problem.
+
+## MQTT Explorer
 
 ## Power outlet
 Since I want to control the power to the printer from Hubitat need an outlet.
@@ -84,6 +96,9 @@ at the largest font is all they can handle on one line. I like to use
 a large font so I can read it from a few feet away.  You can use longer
 names and regret the time to it takes to redo it my way. 
 
+You could modify the code in the driver and any plugin configurations that need it.
+It's a pretty simple fix, but things would break for me so I'm not going to do it.
+
 ## Octoprint Plugins
 ### MQTT
 ### PSU Control
@@ -93,7 +108,8 @@ names and regret the time to it takes to redo it my way.
 ## Hubitat
 ### Octoprint Monitor Driver 
 This will be easy to configure. Right? We just need the ip address
-of the MQTT broker
+of the MQTT broker and the special topic name. 
+
 The Octoprint driver sends Hubitat notifications. It defaults
 to sending over 100 per print job. There a driver preferences you
 can set. Minimal - is just start and finish events. Or you can get
@@ -101,4 +117,7 @@ progress reports every 5% or 10%.  You would not want send a lot events to
 your Cell phone. See Octoprint Notification App
 
 ### Octoprint Notification App
-
+This one is easy. You pick your Mqtt-octoprint driver instance and
+then select other notification devices in Hubitat that you want to
+send the notification too.  DO NOT use the Mqtt-octoprint driver
+in the second set. - Endless loop. How will you stop it ?
