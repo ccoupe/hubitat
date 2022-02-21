@@ -15,9 +15,12 @@
    *    Monitors Octoprints MQTT topics for 3D printer status.
    *    Sets a switch for Started, Stopped (or Failed) for use in Rules. 
    *    shows % done print progress.
-   *    Note: monitoring temperatures may send Hubitat too much, too fast.
-   *      so I don't subscribe to that.
-   *  
+   *   
+   *  NOTE:
+   *  1. requires these plugins [] in Octoprint and that ''
+   *    be set to ..
+   *  2. temperature changes are too chatty for Hubitat, IMO. They are
+   *    not tracked.
    */
 
 import groovy.json.JsonSlurper 
@@ -30,7 +33,8 @@ metadata {
     ) {
     capability "Initialize"
     capability "Switch" 
-           
+    capability "Notification"
+    
     attribute "switch","ENUM",["on","off"]
     attribute "progress", "number"
     attribute "status", "string"
@@ -48,18 +52,31 @@ metadata {
     input name: "topicSub", type: "text", title: "Topic to Subscribe:", 
         description: "Example Topic (octoprint). Please don't use a #", 
         required: true, displayDuringSetup: true
+    /*
     input name: "topicNotify", type: "text", title: "Topic to Notify:", 
         description: "Optional text display device", 
         required: false, displayDuringSetup: true
     input name: "secondPub", type: "text", title: "Second Topic:", 
         description: "Example: homie/pi4_display/display/text/set",
         required: false, displayDuringSetup: true
+    */
     input name: "QOS", type: "text", title: "QOS Value:", required: false, 
         defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required:false,
         defaultValue: false, displayDuringSetup: true
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
+    input ("notifyLevel", "enum", title: "Notify Level",
+            require: false, 
+            displayDuringSetup:true,
+            options: getPrintLevels(), defaultValue: "1% - level")
+
  }
+}
+
+def getPrintLevels() {
+  /* can be computed */
+  def list = ["Minimal", "10% level", "5% level", "1% level"]
+	return list
 }
 
 
@@ -74,23 +91,37 @@ def parse(String description) {
   payload = msg.get('payload')
   if (logEnable) log.info "${topic} => ${payload}"
   def parser = new JsonSlurper()
-  if (topic == "${settings?.topicSub}/progress/printing") {
-      def pr_vals = parser.parseText(payload)
+  if (topic == "${settings?.topicSub}/progress/printing" && settings?.notifyLevel) {
+     def level = settings?.notifyLevel
+     if (level.startsWith("Min")) return;
+     def pr_vals = parser.parseText(payload)
+      sendEvent(name: "progress", value: pr_vals['progress'], displayed: true)
       if (pr_vals['progress']) {
-        sendEvent(name: "progress", value: pr_vals['progress'], displayed: true)
-        if (settings?.topicNotify) {
-          // display only handles 7.5 chars [word] width
+        // is it a level we should report?
+        note = false;
+        val = pr_vals["progress"]
+        if (level.startsWith("10%")) {
+          if (val % 10 == 0) note = true
+        } else if (level.startsWith("5%")) {
+          if (val % 5 == 0) note = true
+        } else if (level.startsWith("1")) {
+          note = true
+        } else 
+          return
+        // display only handles 7.5 chars [word] width
+        if (note) {
           def nm = fixlen(settings?.topicSub, 7)
           send_note(nm+" "+pr_vals['progress'].toString()+"%");
         }
       }
   } else if (topic == "${settings?.topicSub}/PSU/switch/set") {
-      // Octoprint via Cura and PSU Control/MQTT wants us to turn the outlet (PSU) and lamp on.
+      //
       if (payload == "on") on()
       else off()
   } else if (topic.startsWith("${settings?.topicSub}/event")) {
     evt_name = topic.split('/')[-1]
     sendEvent(name: 'status', value: evt_name, displayed: true)
+    
     if (evt_name == "PrintStarted") {
       def pr_vals = parser.parseText(payload)
       sendEvent(name: "switch", value: "on")
@@ -99,8 +130,14 @@ def parse(String description) {
         path = pr_vals['path']
         //log.info "start name: ${pr_vals['name']} path: ${path}"
         sendEvent(name: "file", value: path, displayed: true)
+      send_note(fixlen(settings?.topicSub,7)+" "+evt_name.substring(5))
       }
-    } else if (evt_name == "PrintDone" || evt_name == "PrintFailed") {
+    
+    } else if (evt_name == "PowerOn") {
+      send_note(fixlen(settings?.topicSub,7)+" Power On");
+      
+    } else if (evt_name == "PrintDone" || evt_name == "PrintFailed" ||
+               evt_name == "PrintCancelled" ) {
       def pr_vals = parser.parseText(payload)
       sendEvent(name: "switch", value: "off")
       //log.info "stop payload: ${pr_vals}"
@@ -109,9 +146,7 @@ def parse(String description) {
         //log.info "stop name: ${pr_vals['name']} path: ${path}"
         sendEvent(name: "file", value: path, displayed: true)
       }
-      if (settings?.topicNotify) {
-          send_note(fixlen(settings?.topicSub,7)+" "+evt_name.substring(5));
-      }
+      send_note(fixlen(settings?.topicSub,7)+" "+evt_name.substring(5));
     }
   } 
 }
@@ -206,8 +241,16 @@ def off() {
  sendEvent(name: "switch", value: "off")
 }
 
+void deviceNotification(text) {
+   logDebug("Received notification, creating event. Text: ${text}")
+   sendEvent(name: "deviceNotification", value: text, isStateChange: true)
+}
+
 def send_note(msg) {
+  sendEvent(name: "deviceNotification", value: msg, isStateChange: true)
+  /*
   interfaces.mqtt.publish(settings?.topicNotify, msg, settings?.QOS.toInteger(), false)
   if (settings?.secondPub) 
     interfaces.mqtt.publish(settings?.secondPub, msg, settings?.QOS.toInteger(), false)
+  */
 }
