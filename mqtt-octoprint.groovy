@@ -33,8 +33,12 @@ metadata {
     capability "Initialize"
     capability "Switch" 
     capability "Notification"
+    capability "MotionSensor"
+    capability "ContactSensor"
     
     attribute "switch","ENUM",["on","off"]
+    attribute "motion","ENUM",["active","inactive"]
+    attribute "contact","ENUM",["close","open"]
     attribute "progress", "number"
     attribute "status", "string"
     attribute "file", "string"
@@ -223,16 +227,20 @@ def logsOff(){
 }
 
 def on() {
- sendEvent(name: "switch", value: "on")
- sendEvent(name: "progress", value: "0", displayed: true)
+  sendEvent(name: "switch", value: "on")
+  sendEvent(name: "progress", value: "0", displayed: true)
+  sendEvent(name: "motion", value: "active")
+  sendEvent(name: "contact", value: "open")
 }
 
 def off() {
- sendEvent(name: "switch", value: "off")
+  sendEvent(name: "switch", value: "off")
+  sendEvent(name: "motion", value: "inactive")
+  sendEvent(name: "contact", value: "closed")
 }
 
 void deviceNotification(text) {
-   if (logEnable) log.debug("Received notification, creating event. Text: ${text}")
+   if (logEnable) log.debug("Creating notificationevent. Text: ${text}")
    sendEvent(name: "deviceNotification", value: text, isStateChange: true)
 }
 

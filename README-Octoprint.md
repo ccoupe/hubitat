@@ -106,7 +106,7 @@ It's a pretty simple fix, but things would break for me so I'm not going to do i
 ### PortLister 
 
 ## Hubitat
-### Octoprint Monitor Driver 
+### Mqtt Octoprint Monitor Driver 
 This will be easy to configure. Right? We just need the ip address
 of the MQTT broker and the special topic name. 
 
@@ -114,10 +114,17 @@ The Octoprint driver sends Hubitat notifications. It defaults
 to sending over 100 per print job. There a driver preferences you
 can set. Minimal - is just start and finish events. Or you can get
 progress reports every 5% or 10%.  You would not want send a lot events to
-your Cell phone. See Octoprint Notification App
+your Cell phone. See Octoprint Monitor/Notifications App
 
-### Octoprint Notification App
-This one is easy. You pick your Mqtt-octoprint driver instance and
-then select other notification devices in Hubitat that you want to
-send the notification too.  DO NOT use the Mqtt-octoprint driver
-in the second set. - Endless loop. How will you stop it ?
+### Octoprint Monitors App 
+This is a parent app. It will create the children instance but you have
+to install the driver for both the parent and child.
+Copy the OctoPrint Monitors App and paste it in 
+Copy the OctoPrint Notifications and paste it in 
+Install the two apps from the Apps -> Add User App
+
+From the Apps you select OctoPrint Monitors App. From there, name and create
+a child app. When the child App opens - select the Mqtt Octoprint Driver and
+then pick the additional notification devices. DO NOT use the Mqtt-octoprint driver
+in the second set- that would create an Endless loop and become very annoying. 
+Bonus points if you know how will you stop it. Better not to try.
