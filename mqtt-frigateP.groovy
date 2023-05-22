@@ -193,6 +193,15 @@ def refresh() {
 // 
 def configure() {
   log.info "Configure.."
+  /*
+  if (settings?.propertySub) {
+    def actives = settings?.active_hold.toString()
+    def urltmp = "${settings?.topicSub}/${settings?.propertySub}/set"
+    interfaces.mqtt.publish(urltmp, actives, settings?.QOS.toInteger(), false)
+    if (logEnable) log.debug "setting ${urltmp} to ${actives}"
+    sendEvent(name: "active_hold", value: settings.active_hold, displayed: true);
+  }
+  */
 }
 
 def on() {

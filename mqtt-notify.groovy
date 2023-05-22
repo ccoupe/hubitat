@@ -1,5 +1,5 @@
 /**
-   * mqtt-alarm.groovy.
+   * mqtt-notify.groovy.
    * Author: Cecil Coupe 
    * Purpose:
    *  Notification and Speech Synthesis:  text to TTS, sends mp3 to MQTT topic.
@@ -55,6 +55,9 @@ def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
+}
+
+def configure() {
 }
 
 
@@ -131,5 +134,5 @@ def deviceNotification(text) {
   if (logEnable) {
     log.debug "send ${text} => ${settings.topicPub}"
   }
-  interfaces.mqtt.publish("${settings.topicPub}", text, settings?.QOS.toInteger(), false)
+  interfaces.mqtt.publish("${settings.topicPub}", text, settings?.QOS.toInteger(), false)    
 }

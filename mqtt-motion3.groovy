@@ -1,5 +1,5 @@
 /**
-   * mqtt-frigate-person.groovy.
+   * mqtt-motion3.groovy.
    * Author: Cecil Coupe - derived from sample codes from many others.
    *
    *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
@@ -15,11 +15,16 @@
    */
    
    /* 
-    * Version 1 Aug 20, 2021 - the beginning.
+    * Version 2 uses json for configuration messages
+    * Version 3 - January 26, 2020 - uses homie v3 topic structure, non-json
+    * Version 3.1 - March 8, 2020 - optional - ask for face/body detection
+    * Version 3.2 - March 24, 2020 
+            - enable/disable. 
+            - select ML algorithm
    */
 
 metadata {
-  definition (name: "MQTT Motion v3", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-frigateP.groovy") {
+  definition (name: "MQTT Motion v3", namespace: "ccoupe", author: "Cecil Coupe", importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-motion3.groovy") {
     capability "Initialize"
     capability "MotionSensor"
     capability "Configuration"
