@@ -190,6 +190,14 @@ def speak(text) {
   speakpub(text, false)
 }
 
+def speak(text, volume) {
+  speakpub(text, false)
+}
+
+def speak(text, volume, voice) {
+  speakpub(text, false)
+}
+
 def deviceNotification(text) {
   speakpub(text, true)
 }
