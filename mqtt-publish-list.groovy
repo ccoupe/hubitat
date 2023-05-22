@@ -14,51 +14,38 @@
    *
    *  Changes:
    *
-   *  1.0.0 - Initial release
-   *  listens on [homie/trumpy_bear]/screen/control topic. Does not publish to mqtt
+   *  1.0.0 - Looks like a switch for dashboard purposes.
    */
 
+import groovy.json.JsonOutput
+
 metadata {
-		definition (name: "Mqtt Trumpy Active Switch", namespace: "ccoupe", 
+		definition (name: "Mqtt Publish List", namespace: "ccoupe", 
 			author: "Cecil Coupe", 
-			importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/trumpy-active-switch.groovy") {
+			importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/raw/mqtt-publish-list.groovy") {
 				capability "Initialize"
 				capability "Switch"
 				
-				attribute "switch","ENUM",["on","off"]
 		 }
 
 		preferences {
 			input name: "MQTTBroker", type: "text", title: "MQTT Broker Address:", required: true, displayDuringSetup: true
 			input name: "username", type: "text", title: "MQTT Username:", description: "(blank if none)", required: false, displayDuringSetup: true
 			input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false, displayDuringSetup: true
-			input name: "topicSub", type: "text",
-        title: "Topic to Subscribe:",
-        description: "Example Topic (homie/trumpy_bear)",
-        required: false, 
-        displayDuringSetup: true,
-        defaultValue: 'homie/trumpy_bear'
+			input name: "topicPub", type: "text", title: "Topic to Publish to:", description: "Example Topic 'test/switch/set", required: false, displayDuringSetup: true
+			input name: "onPub", type: "text", title: "Nodes List",
+          description: "Nodes to Boot", required: false, 
+          displayDuringSetup: true
 			input (
-	      name: "AutoOff",
-	      type: "bool",
-	      title: "Enable auto off", 
-	      required: false, 
-	      displayDuringSetup: false, 
-	      defaultValue: false
+	      name: "AutoOff", type: "bool", title: "Enable auto off",  required: false, 
+	      displayDuringSetup: false, defaultValue: true
 	    )
 	    input (
-	      name: "offSecs",
-	      type: "number",
-	      title: "Seconds to Off",
-	      required: false,
-	      displayDuringSetup: true,
-	      defaultValue: 10,
-	      description: "Seconds until auto turning off"
+	      name: "offSecs", type: "number", title: "Seconds to Off", required: false,
+	      displayDuringSetup: true, defaultValue: 1, description: "Seconds until auto turning off"
 	      )
-      input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
     }
 }
-
 
 def installed() {
    log.info "installed..."
@@ -67,18 +54,17 @@ def installed() {
 // Parse incoming device messages to generate events
 def parse(String description) {
   topic = interfaces.mqtt.parseMessage(description).topic
-	payload = interfaces.mqtt.parseMessage(description).payload
-  
+	payload = interfaces.mqtt.parseMessage(description).payload  
   if (logEnable) log.info "on message: ${topic} : ${payload}"
-  subTopic = "${settings?.topicSub}/screen/control"
-  if (topic == subTopic) {
-    if (payload.contains("awake")){
-       sendEvent(name: "switch", value: "on")
-      }
-    if (payload.contains('sleep')){
-       sendEvent(name: "switch", value: "on")
+  /* we are send only - we don't listen to mqtt
+  tur_topic = "homie/${settings?.topicSub}/control"
+  if (topic == tur_Topic) {
+    if (payload.contains("OK")){
+      // device signaled it's ready. Tell hubitat it's done.
+      sendEvent(name: "switch", value: "off")
     }
   }
+  */
 }
 
 
@@ -106,9 +92,11 @@ def initialize() {
         //give it a chance to start
         pauseExecution(1000)
         log.info "Connection established"
-        topic = "${settings?.topicSub}/screen/control"
+        /*
+        topic = settings?.topicPub
         if (logEnable) log.debug "Subscribed to: ${topic}"
         mqttInt.subscribe(topic)
+        */
           
     } catch(e) {
         if (logEnable) log.debug "Initialize error: ${e.message}"
@@ -146,8 +134,7 @@ def mqttClientStatus(String status) {
 }
 
 def configure() {
-  log.info "Configure.."
-
+  log.info "Configure"
 }
 
 
@@ -158,11 +145,30 @@ def logsOff(){
 
 
 def on() {
-  if (logEnable) log.info "Manual  on"
-    sendEvent(name: "switch", value: "on")
+  def jmap = [:]
+  def nodes = []
+  if (settings?.onPub) {
+    nodes = settings.onPub.split(',')
+  }
+  if (nodes.size() > 0) {
+    jmap["cmd"] = "reboot"
+    jmap["nodes"] = nodes
+    jstr = JsonOutput.toJson(jmap)
+    log.info "publish ${jstr} to ${settings?.topicPub}"
+    interfaces.mqtt.publish(settings?.topicPub, jstr, 0, false)
+    if (settings?.AutoOff) {
+      runIn(settings?.offSecs.toInteger(), off)
+    }
+  }
 }
 
 def off() {
-  if (logEnable) log.info "Manual on"
-    sendEvent(name: "switch", value: "off")
+  /*
+  // Do not send anything for off. We just want the switch visual reset.
+  offStr = 'off'
+  if (settings?.offPub) onStr = settings.offPub
+  if (logEnable) log.info "publish 'off' to ${settings?.topicPub}"
+  interfaces.mqtt.publish(settings?.topicPub, offStr, 1, false)
+  */
 }
+

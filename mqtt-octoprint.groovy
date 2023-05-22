@@ -60,12 +60,6 @@ metadata {
     input name: "retained", type: "bool", title: "Retain message:", required:false,
         defaultValue: false, displayDuringSetup: true
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
-    input ("notifyLevel", "enum", title: "Notify Level",
-            require: false, 
-            displayDuringSetup:true,
-            options: getPrintLevels(), 
-            defaultValue: "1% - level")
-
  }
 }
 
@@ -85,33 +79,21 @@ def parse(String description) {
   msg = interfaces.mqtt.parseMessage(description)
   topic = msg.get('topic')
   payload = msg.get('payload')
+  if (state.starting == true) {
+    log.info "Ignoring ${topic} => ${payload}"
+    return
+  }
   if (logEnable) log.info "${topic} => ${payload}"
   def parser = new JsonSlurper()
-  if (topic == "${settings?.topicSub}/progress/printing" && settings?.notifyLevel) {
-     def level = settings?.notifyLevel
-     if (level.startsWith("Min")) return;
-     def pr_vals = parser.parseText(payload)
-      sendEvent(name: "progress", value: pr_vals['progress'], displayed: true)
-      if (pr_vals['progress']) {
-        // is it a level we should report?
-        note = false;
-        val = pr_vals["progress"]
-        if (level.startsWith("10%")) {
-          if (val % 10 == 0) note = true
-        } else if (level.startsWith("5%")) {
-          if (val % 5 == 0) note = true
-        } else if (level.startsWith("1")) {
-          note = true
-        } else 
-          return
-        // display only handles 7.5 chars [word] width
-        if (note) {
-          def nm = fixlen(settings?.topicSub, 7)
-          send_note(nm+" "+pr_vals['progress'].toString()+"%");
-        }
-      }
+  if (topic == "${settings?.topicSub}/progress/printing") {
+    def pr_vals = parser.parseText(payload)
+    def nm = fixlen(settings?.topicSub, 7)
+    def pcent = pr_vals['progress']
+    if (pcent > 0) {
+      // at boot time, octopi can send a spurious 0% status"
+      send_note(nm+" "+pr_vals['progress'].toString()+"%");
+    }
   } else if (topic == "${settings?.topicSub}/PSU/switch/set") {
-      //
       if (payload == "on") on()
       else off()
   } else if (topic.startsWith("${settings?.topicSub}/event")) {
@@ -165,10 +147,17 @@ def uninstalled() {
   interfaces.mqtt.disconnect()
 }
 
+def startup_finished() {
+  log.info "CLEARING startup flag"
+  state.starting = false
+}
+  
 def initialize() {
 	if (logEnable) runIn(900,logsOff) // clears debugging after 900 secs 
   if (logEnable) log.info "Initalize..."
 	try {
+    // don't process retained messages (for subscribed topics)
+    state.starting = true
     def mqttInt = interfaces.mqtt
     //open connection
     mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
@@ -185,6 +174,9 @@ def initialize() {
     topic = "${settings?.topicSub}/PSU/switch/set"
     mqttInt.subscribe(topic)
 		if (logEnable) log.debug "Subscribed to: ${topic}"
+    // Don't processes the mqtt retained messages.
+    // 2 secs from now, allow mqtt message to be processed.
+    runIn(4,startup_finished)
   } catch(e) {
     if (logEnable) log.debug "Initialize error: ${e.message}"
   }
