@@ -1,5 +1,5 @@
 /*
- *  Octoprint Monitors
+ *  Mqtt Network Notifications
  *    Cecil Coupe shamelessly borrowed code from 
  *      Simple State Machines - Copyright 2019 Joel Wetzel
  *      Notification Proxy App - Copyright 2021 Robert Morris
@@ -17,8 +17,8 @@
  
 
 definition(
-  parent: 	"ccoupe:OctoPrint Monitors",
-   name: "OctoPrint Notifications",
+  parent: 	"ccoupe:MQTT Network Monitors",
+   name: "MQTT Network Notifications",
    namespace: "ccoupe",
    author: "Cecil Coupe",
    description: 'Select one "monitor" device to route its notifications to any number of notification devices',
@@ -29,22 +29,7 @@ definition(
 preferences {
 	page(name: "mainPage")
 }
-/*
-preferences {
-   page(name: "mainPage", install: true, uninstall: true) {  
-      section("Choose devices") {
-         input "proxyDevice", "device.MqttOctoprintMonitor", 
-            title: "Mqtt Octoprint Monitor"		
-         input "notificationDevice", "capability.notification",
-            title: "Notification Devices", 
-            multiple: true
-         paragraph "When a notification device is sent to the proxy notification device, it will send the notification to all of the notification devices selected."
-         input "debugMode", "bool",
-            title: "Enable debug logging"
-      }
-   }
-}
-*/
+
 
 void installed() {
    log.debug "installed()"
@@ -62,20 +47,34 @@ void initialize() {
    subscribe(proxyDevice, "deviceNotification", notificationHandler)
 }
 
-void notificationHandler(evt) {
-  logDebug "Sending ${evt.value} to ${notificationDevice}"
-  String text = "${evt.value}"
-  flds = text.split(" ")
-  nlvl = settings?.notifyLevel
-  // drop thru mean publish notification
-  if (flds[1].contains("%") && nlvl != "Minimal") {
-    String vs = flds[1]
-    Integer val = vs.substring(0, vs.indexOf("%")).toInteger()
-    if (nlvl.startsWith("10%") && (val % 10 != 0)) return
-    if (nlvl.startsWith("5%") && (val % 5 != 0)) return
+/*
+def join2(beg, lst) {
+  len = lst.size()
+  String out = ""
+  for (int i = 1; i < len; i++) {
+    out = out + lst[i]
+    if (i < len-1) out = out + " "
   }
+  return out
+}
+*/
+
+void notificationHandler(evt) {
+  String ent = "${evt.value}"
+  def flds = []
+  flds = ent.split(" ")
+  node = flds[0]
+  //msg = join2(1, flds)
   try {
-    notificationDevice.deviceNotification(text)
+    if (flds[1] == 'is' && flds[2] == 'OK') {
+      if (settings?.passOK) {
+        logDebug "Sending ${evt.value} to ${notificationDevice}"
+        notificationDevice.deviceNotification(ent)
+      }
+    } else {
+      logDebug "Sending ${evt.value} to ${notificationDevice}"
+      notificationDevice.deviceNotification(ent)
+    }
   }
   catch (ex) {
     log.error("Error sending notification to devices: ${ex}")
@@ -92,15 +91,15 @@ def mainPage() {
 			app.updateLabel(app.name)
 		}
 		section(getFormat("title", (app?.label ?: app?.name).toString())) {
-			input(name:	"oPChildName", type: "string", title: "OctoPrint Notifications Child", multiple: false, required: true, submitOnChange: true)
+			input(name:	"oPChildName", type: "string", title: "MQTT Network Notifications Child", multiple: false, required: true, submitOnChange: true)
             
 			if (settings.oPChildName) {
 				app.updateLabel(settings.oPChildName)
 			}
 		}
     section () {
-       input "proxyDevice", "device.MqttOctoprintMonitor", 
-          title: "Mqtt Octoprint Monitor (source) "		
+       input "proxyDevice", "device.MqttNetworkMonitor", 
+          title: "Mqtt Network Monitor (device) "		
        input "notificationDevice", "capability.notification",
           title: "Notification Devices (destinations)", 
           options: (filterNoteDevices(settings.proxyDevice)),
@@ -108,21 +107,16 @@ def mainPage() {
        paragraph "A notification from source device is sent to the destination notification device(s)."
     }
 		section () {
-      input ("notifyLevel", "enum", title: "Pass messages:",
-            require: false, 
-            displayDuringSetup:true,
-            options: getPrintLevels(), 
-            defaultValue: "1% - level")
-			input(name:	"enableLogging", type: "bool", title: "Enable Debug Logging?", defaultValue: true,	required: true)
+      input(name: "passOK", type: "bool", title: "Send OK messages?", 
+            defaultValue: false,
+            required: true)
+			input(name:	"enableLogging", type: "bool", title: "Enable Debug Logging?",
+            defaultValue: true,
+            required: true)
 		}
 	}
 }
 
-def getPrintLevels() {
-  /* can be computed */
-  def list = ["Minimal", "10% level", "5% level", "1% level"]
-	return list
-}
 
 def filterNoteDevices(exclude) {
   log.info("filterNoteDevices: called")

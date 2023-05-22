@@ -1,5 +1,5 @@
 /**
- *  Octoprint Monitors
+ *  MQTT Network Monitors
  *    Cecil Coupe shamelessly borrowed code from 
  *      Simple State Machines - Copyright 2019 Joel Wetzel
  *      Notification Proxy App - Copyright 2021 Robert Morris
@@ -17,10 +17,10 @@
 
 
 definition(
-    name: "OctoPrint Monitors",
+    name: "MQTT Network Monitors",
     namespace: "ccoupe",
     author: "Cecil Coupe",
-    description: "Setup OctoPrint Notification Routes",
+    description: "Setup MQTT Network Notification Routes",
     category: "Convenience",
 	iconUrl: "",
     iconX2Url: "",
@@ -75,7 +75,7 @@ def getFormat(type, myText=""){
 def display(){
 	section() {
 		paragraph getFormat("line")
-		paragraph "<div style='color:#1A77C9;text-align:center'>OctoPrint Monitors - @ccoupe<br><a href='https://github.com/ccoupe/' target='_blank'>Click here for more Hubitat apps/drivers on my GitHub!</a></div>"
+		paragraph "<div style='color:#1A77C9;text-align:center'>MQTT Network Monitors - @ccoupe<br><a href='https://github.com/ccoupe/' target='_blank'>Click here for more Hubitat apps/drivers on my GitHub!</a></div>"
 	}       
 }
 
@@ -88,13 +88,9 @@ def mainPage() {
 			section(getFormat("title", "${app.label}")) {
 				paragraph "*** Always a BETA ***"
 			}
-  			section("<b>Create a OctoPrint Notifcations Child App:</b>") {
-          app(name: "anyOpenApp", appName: "OctoPrint Notifications", namespace: "ccoupe",
-          title: "<b>Create a new OctoPrint Notification</b>", multiple: true)
-			}
-      section("<b>Create a Bambu Notifcations Child App:</b>") {
-          app(name: "anyOpenApp", appName: "Bambu Notifications", namespace: "ccoupe",
-          title: "<b>Create a new Bambu Notification</b>", multiple: true)
+  			section("<b>Create a MQTT Notifcations Child App:</b>") {
+          app(name: "anyOpenApp", appName: "MQTT Network Notifications", namespace: "ccoupe",
+          title: "<b>Create a new MQTT Network Notification</b>", multiple: true)
 			}
 			display()
 		}

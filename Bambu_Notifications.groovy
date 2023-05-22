@@ -1,5 +1,5 @@
 /*
- *  Octoprint Monitors
+ *  Bambu Notifications
  *    Cecil Coupe shamelessly borrowed code from 
  *      Simple State Machines - Copyright 2019 Joel Wetzel
  *      Notification Proxy App - Copyright 2021 Robert Morris
@@ -18,7 +18,7 @@
 
 definition(
   parent: 	"ccoupe:OctoPrint Monitors",
-   name: "OctoPrint Notifications",
+   name: "Bambu Notifications",
    namespace: "ccoupe",
    author: "Cecil Coupe",
    description: 'Select one "monitor" device to route its notifications to any number of notification devices',
@@ -92,15 +92,15 @@ def mainPage() {
 			app.updateLabel(app.name)
 		}
 		section(getFormat("title", (app?.label ?: app?.name).toString())) {
-			input(name:	"oPChildName", type: "string", title: "OctoPrint Notifications Child", multiple: false, required: true, submitOnChange: true)
+			input(name:	"oPChildName", type: "string", title: "Bambu Notifications Child", multiple: false, required: true, submitOnChange: true)
             
 			if (settings.oPChildName) {
 				app.updateLabel(settings.oPChildName)
 			}
 		}
     section () {
-       input "proxyDevice", "device.MqttOctoprintMonitor", 
-          title: "Mqtt Octoprint Monitor (source) "		
+       input "proxyDevice", "device.BambuLabs", 
+          title: "Mqtt BambuLabs Monitor (source) "		
        input "notificationDevice", "capability.notification",
           title: "Notification Devices (destinations)", 
           options: (filterNoteDevices(settings.proxyDevice)),
