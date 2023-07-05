@@ -1,5 +1,5 @@
 /**
-   * mqtt-notify.groovy.
+   * mqtt-alarm.groovy.
    * Author: Cecil Coupe 
    * Purpose:
    *  Notification and Speech Synthesis:  text to TTS, sends mp3 to MQTT topic.
@@ -19,6 +19,8 @@
    
    /* 
     * Version 1.0.0 - provides Notification (text)
+    *         1.0.3 - some settings can be set - not sticky on device. 
+    *                 Use the device .json file for sticky.
    */
 
 metadata {
@@ -40,10 +42,15 @@ metadata {
     input name: "QOS", type: "text", title: "QOS Value:", required: false, defaultValue: "1", displayDuringSetup: true
     input name: "retained", type: "bool", title: "Retain message:", required: false, defaultValue: false, displayDuringSetup: true
     input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
+    input("stroke", "enum", title: "Text Color", require: false, displayDuringSetup:true, 
+          options: ["Red", "White", "Blue", "Green"], defaultValue: "White")
+    input("font", "enum", title: "Font Size", require: false, displayDuringSetup:true, 
+          options: ["1 - Two Lines", "2 - Three Lines", "3 - Four Lines"], defaultValue: "1 - Two Lines")
+    input("blank", "integer", title: "Blank After Minutes", require: false, displayDuringSetup:true, defaultValue: 5)
   }
 }
 
-
+import groovy.json.JsonOutput
 
 def installed() {
     log.info "installed..."
@@ -58,6 +65,37 @@ def parse(String description) {
 }
 
 def configure() {
+    def sendit = false
+    def items = [:]
+    if (settings?.stroke) {
+        if (settings.stroke != state.stroke) {
+            state.stroke = settings.stroke
+            items["stroke"] = state.stroke
+        }
+    }
+    if (settings?.font) {
+      if (settings.font != state.font) {
+        flds = settings.font.split(" ")
+        def num = 1
+        if (flds[0] == "1") num = 1 
+        else if (flds[0] == "2") num = 2
+        else if (flds[0] == "3") num = 3
+        state.font = num
+        items["font"] = num
+      }
+    }
+    if (settings?.blank) {
+      if (settings.blank != state.blank) {
+        def tmo = settings.blank.toInteger()
+        if (tmo != state.blank) state.blank = tmo
+        items["blank"] = tmo      
+      }
+    }
+    flds = settings.topicPub.split("/")
+    topic = "homie/"+flds[1]+"/display/cmd/set" // a hack - assumes many things.
+    jstr = JsonOutput.toJson(["settings": items])
+    log.info "Configure: ${jstr} --> ${topic}"
+    interfaces.mqtt.publish(topic, jstr, settings?.QOS.toInteger(), false) 
 }
 
 
