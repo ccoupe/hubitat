@@ -15,13 +15,12 @@
    *  Changes:
    *
    *  1.0.0 - Initial release
-   *  listens on [homie/trumpy_bear]/screen/control topic. Does not publish to mqtt
    */
 
 metadata {
-		definition (name: "Mqtt Trumpy Active Switch", namespace: "ccoupe", 
+		definition (name: "MQTT Virtual Switch", namespace: "ccoupe", 
 			author: "Cecil Coupe", 
-			importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/trumpy-active-switch.groovy") {
+			importURL: "https://raw.githubusercontent.com/ccoupe/hubitat/master/mqtt-switch.groovy") {
 				capability "Initialize"
 				capability "Switch"
 				
@@ -32,12 +31,7 @@ metadata {
 			input name: "MQTTBroker", type: "text", title: "MQTT Broker Address:", required: true, displayDuringSetup: true
 			input name: "username", type: "text", title: "MQTT Username:", description: "(blank if none)", required: false, displayDuringSetup: true
 			input name: "password", type: "password", title: "MQTT Password:", description: "(blank if none)", required: false, displayDuringSetup: true
-			input name: "topicSub", type: "text",
-        title: "Topic to Subscribe:",
-        description: "Example Topic (homie/trumpy_bear)",
-        required: false, 
-        displayDuringSetup: true,
-        defaultValue: 'homie/trumpy_bear'
+			input name: "topicSub", type: "text", title: "Topic to Subscribe:", description: "Example Topic (homie/trumpy_enable)", required: false, displayDuringSetup: true
 			input (
 	      name: "AutoOff",
 	      type: "bool",
@@ -47,16 +41,16 @@ metadata {
 	      defaultValue: false
 	    )
 	    input (
-	      name: "offSecs",
+	      name: "OffMilli",
 	      type: "number",
-	      title: "Seconds to Off",
+	      title: "Time to Off",
 	      required: false,
 	      displayDuringSetup: true,
-	      defaultValue: 10,
-	      description: "Seconds until auto turning off"
+	      defaultValue: 500,
+	      description: "Milliseconds for turning off"
 	      )
-      input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
-    }
+				input("logEnable", "bool", title: "Enable logging", required: true, defaultValue: true)
+			}
 }
 
 
@@ -70,18 +64,14 @@ def parse(String description) {
 	payload = interfaces.mqtt.parseMessage(description).payload
   
   if (logEnable) log.info "on message: ${topic} : ${payload}"
-  subTopic = "${settings?.topicSub}/screen/control"
+  subTopic = "${settings?.topicSub}/switch/state"
   if (topic == subTopic) {
-    if (payload == "awake"){
-      log.info "trumpy active turns on"
-       sendEvent(name: "switch", value: "on")
+    if (payload.contains("on")){
+       on()
+      }
+    if (payload.contains("off")){
+       off()
     }
-    else if (payload == 'closing'){
-      log.info "trumpy active turns off"
-      sendEvent(name: "switch", value: "off")
-    }
-  } else {
-    log.warn "${topic} != ${subTopic}"
   }
 }
 
@@ -112,7 +102,7 @@ def initialize() {
         //give it a chance to start
         pauseExecution(1000)
         log.info "Connection established"
-        topic = "${settings?.topicSub}/screen/control"
+        topic = "${settings?.topicSub}/switch/state"
         if (logEnable) log.debug "Subscribed to: ${topic}"
         mqttInt.subscribe(topic)
           
@@ -152,8 +142,8 @@ def mqttClientStatus(String status) {
 }
 
 def configure() {
-  log.info "Configure.."
-
+  log.info "Configure..turns off"
+  off()
 }
 
 
@@ -164,11 +154,14 @@ def logsOff(){
 
 
 def on() {
-  if (logEnable) log.info "Manual  on"
-    sendEvent(name: "switch", value: "on")
+  if (logEnable) log.info "Virtual Switch on"
+	sendEvent(name: "switch", value: "on")
+  if (AutoOff) {
+        runInMillis(settings.OffMilli, off)
+    }
 }
 
 def off() {
-  if (logEnable) log.info "Manual on"
+  if (logEnable) log.info "Virtual Switch off"
     sendEvent(name: "switch", value: "off")
 }

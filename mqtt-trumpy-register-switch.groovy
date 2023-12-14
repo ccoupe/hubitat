@@ -103,8 +103,10 @@ def initialize() {
         def mqttInt = interfaces.mqtt
         //open connection
         mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
-        mqttInt.connect(mqttbroker, "hubitat_${device}", settings?.username,settings?.password)
-        //give it a chance to start
+        brokerName = "${getLocation().getHub().name}_${device}"
+        log.info "connect to ${mqttbroker} as ${brokerName}"
+        mqttInt.connect(mqttbroker, brokerName, settings?.username,settings?.password)
+       //give it a chance to start
         pauseExecution(1000)
         log.info "Connection established"
         topic = "${settings?.topicSub}/screen/control"
