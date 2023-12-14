@@ -85,18 +85,20 @@ def uninstalled() {
 def initialize() {
 	if (logEnable) runIn(900,logsOff)
 	try {
-        def mqttInt = interfaces.mqtt
-        //open connection
-        mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
-        mqttInt.connect(mqttbroker, "hubitat_${device}", settings?.username,settings?.password)
-        //give it a chance to start
-        pauseExecution(1000)
-        log.info "Connection established"
-        /*
+    def mqttInt = interfaces.mqtt
+    //open connection
+    mqttbroker = "tcp://" + settings?.MQTTBroker + ":1883"
+    brokerName = "${getLocation().getHub().name}_${device}"
+    log.info "connect to ${mqttbroker} as ${brokerName}"
+    mqttInt.connect(mqttbroker, brokerName, settings?.username,settings?.password)
+    //give it a chance to start
+    pauseExecution(1000)
+    log.info "Connection established"
+    /*
         topic = settings?.topicPub
         if (logEnable) log.debug "Subscribed to: ${topic}"
         mqttInt.subscribe(topic)
-        */
+    */
           
     } catch(e) {
         if (logEnable) log.debug "Initialize error: ${e.message}"
