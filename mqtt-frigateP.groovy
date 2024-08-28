@@ -33,8 +33,10 @@ metadata {
     command "set_Active"
     command "arrived"         // force presence value
     command "departed"
-    command "clips_on"        // set clips to on/off
-    command "clips_off"
+    //command "clips_on"        // set clips to on/off
+    //command "clips_off"
+    command "recordings_on"        // set clips to on/off
+    command "recordings_off"
     command "snapshots_on"    // set snapshots to on/off
     command "snapshots_off"
 
@@ -244,18 +246,31 @@ def departed() {
     sendEvent(name: "presence", value: "not present", linkText: deviceName, descriptionText: descriptionText)
   }
 }
-
+/*
 def clips_on() {
-    def topic = "${settings?.topicSub}/clips/set"
+    def topic = "${settings?.topicSub}/recordings/set"
     if (logEnable) log.debug " ${topic} ON"
     interfaces.mqtt.publish(topic, "ON", settings?.QOS.toInteger(), settings?.retained)
 }
 
 def clips_off() {
-    def topic = "${settings?.topicSub}/clips/set"
+    def topic = "${settings?.topicSub}/recordings/set"
     if (logEnable) log.debug " ${topic} OFF"
     interfaces.mqtt.publish(topic, "OFF", settings?.QOS.toInteger(), settings?.retained)
 }
+*/
+def recordings_on() {
+    def topic = "${settings?.topicSub}/recordings/set"
+    if (logEnable) log.debug " ${topic} ON"
+    interfaces.mqtt.publish(topic, "ON", settings?.QOS.toInteger(), settings?.retained)
+}
+
+def recordings_off() {
+    def topic = "${settings?.topicSub}/recordings/set"
+    if (logEnable) log.debug " ${topic} OFF"
+    interfaces.mqtt.publish(topic, "OFF", settings?.QOS.toInteger(), settings?.retained)
+}
+
 
 def snapshots_on() {
     def topic = "${settings?.topicSub}/snapshots/set"
