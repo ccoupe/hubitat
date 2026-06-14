@@ -105,8 +105,13 @@ def parse(String description) {
   def locations = [:]
   locations['doorbell_cam'] = 'Front Entry'
   locations['pi5_cam'] = 'Office'
-  locations['trumpy_cam'] = 'Living Room'
+  locations['office_cam'] = 'Office'
+  locations['trumpy_cam'] = 'Family Room'
   locations['guesty_cam'] = 'Guest Room'
+  locations['living_cam'] = 'Living Room'
+  locations['garage_cam'] = 'Garage'
+  locations['master_cam'] = 'Master Bedroom'
+  locations['patio_cam'] = 'Patio'
     
   //if (logEnable) log.info("use_cam: ${use_cam} use_persons: ${use_persons}")
   if (use_cam && use_persons) {
